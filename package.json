@@ -1,0 +1,28 @@
+{
+    "name": "transport-system-management",
+    "version": "1.0.0",
+    "description": "Transport System Management App - Monorepo",
+    "private": true,
+    "workspaces": [
+        "frontend",
+        "backend"
+    ],
+    "scripts": {
+        "install:all": "npm install && cd frontend && npm install && cd ../backend && npm install",
+        "dev:frontend": "cd frontend && npm run dev",
+        "dev:backend": "cd backend && npm run dev",
+        "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+        "build:frontend": "cd frontend && npm run build",
+        "build:backend": "cd backend && npm run build"
+    },
+    "keywords": [
+        "transport",
+        "management",
+        "monorepo"
+    ],
+    "author": "",
+    "license": "ISC",
+    "devDependencies": {
+        "concurrently": "^8.2.2"
+    }
+}
