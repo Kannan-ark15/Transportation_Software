@@ -1,19 +1,21 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import Navbar from './components/Navbar';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import Layout from './components/Layout';
+import Dashboard from './components/Dashboard';
 import CompanyList from './components/CompanyList';
-import CompanyForm from './components/CompanyForm';
 
 function App() {
     return (
         <Router>
             <div className="App">
-                <Navbar />
-                <Routes>
-                    <Route path="/" element={<CompanyList />} />
-                    <Route path="/add" element={<CompanyForm />} />
-                    <Route path="/edit/:id" element={<CompanyForm />} />
-                </Routes>
+                <Layout>
+                    <Routes>
+                        <Route path="/" element={<Dashboard />} />
+                        <Route path="/masters/company" element={<CompanyList />} />
+                        {/* Catch all route - redirect to dashboard */}
+                        <Route path="*" element={<Navigate to="/" replace />} />
+                    </Routes>
+                </Layout>
             </div>
         </Router>
     );
