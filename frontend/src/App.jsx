@@ -3,6 +3,11 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
 import CompanyList from './components/CompanyList';
+import ProductList from './components/ProductList';
+import DriverList from './components/DriverList';
+import PumpList from './components/PumpList';
+import PlaceList from './components/PlaceList';
+import DealerList from './components/DealerList';
 
 function App() {
     return (
@@ -12,7 +17,11 @@ function App() {
                     <Routes>
                         <Route path="/" element={<Dashboard />} />
                         <Route path="/masters/company" element={<CompanyList />} />
-                        {/* Catch all route - redirect to dashboard */}
+                        <Route path="/masters/products" element={<ProductList />} />
+                        <Route path="/masters/drivers" element={<DriverList />} />
+                        <Route path="/masters/pumps" element={<PumpList />} />
+                        <Route path="/masters/places" element={<PlaceList />} />
+                        <Route path="/masters/dealers" element={<DealerList />} />
                         <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
                 </Layout>

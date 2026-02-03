@@ -9,37 +9,35 @@ const api = axios.create({
     },
 });
 
-// Company API endpoints
-export const companyAPI = {
-    // Get all companies
+const generateCRUD = (endpoint) => ({
     getAll: async () => {
-        const response = await api.get('/companies');
+        const response = await api.get(endpoint);
         return response.data;
     },
-
-    // Get company by ID
     getById: async (id) => {
-        const response = await api.get(`/companies/${id}`);
+        const response = await api.get(`${endpoint}/${id}`);
         return response.data;
     },
-
-    // Create new company
-    create: async (companyData) => {
-        const response = await api.post('/companies', companyData);
+    create: async (data) => {
+        const response = await api.post(endpoint, data);
         return response.data;
     },
-
-    // Update company
-    update: async (id, companyData) => {
-        const response = await api.put(`/companies/${id}`, companyData);
+    update: async (id, data) => {
+        const response = await api.put(`${endpoint}/${id}`, data);
         return response.data;
     },
-
-    // Delete company
     delete: async (id) => {
-        const response = await api.delete(`/companies/${id}`);
+        const response = await api.delete(`${endpoint}/${id}`);
         return response.data;
     },
-};
+});
+
+// APIs
+export const companyAPI = generateCRUD('/companies');
+export const productAPI = generateCRUD('/products');
+export const driverAPI = generateCRUD('/drivers');
+export const pumpAPI = generateCRUD('/pumps');
+export const placeAPI = generateCRUD('/places');
+export const dealerAPI = generateCRUD('/dealers');
 
 export default api;

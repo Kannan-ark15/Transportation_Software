@@ -27,7 +27,12 @@ const Sidebar = ({ isOpen, onClose }) => {
             ),
             hasSubmenu: true,
             submenu: [
-                { label: 'Company Master', path: '/masters/company' }
+                { label: 'Company Master', path: '/masters/company' },
+                { label: 'Product Master', path: '/masters/products' },
+                { label: 'Driver Master', path: '/masters/drivers' },
+                { label: 'Pump Master', path: '/masters/pumps' },
+                { label: 'Place Master', path: '/masters/places' },
+                { label: 'Dealer Master', path: '/masters/dealers' }
             ]
         },
         {
