@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import DataToolbar from './common/DataToolbar';
 import { placeAPI, companyAPI, productAPI } from '../services/api';
 import Pagination from './Pagination';
 import {
@@ -82,6 +83,62 @@ const PlaceList = () => {
         finally { setLoading(false); }
     };
 
+    const handleImport = async (importedData) => {
+        try {
+            setLoading(true);
+            let successCount = 0;
+            let errors = [];
+
+            for (const row of importedData) {
+                const companyName = row['Company'] || row['company_name'];
+                const productName = row['Product'] || row['product_name'];
+
+                const company = companies.find(c => c.company_name?.toLowerCase() === companyName?.toLowerCase());
+                const product = products.find(p => p.product_name?.toLowerCase() === productName?.toLowerCase());
+
+                if (!company || !product) {
+                    errors.push(`${row['To Place'] || 'Unknown Route'} (Missing Company/Product)`);
+                    continue;
+                }
+
+                const mappedData = {
+                    company_id: company.id,
+                    from_place: company.place, // Auto-fill source from company place
+                    to_place: row['To Place'] || row['to_place'],
+                    district: row['District'] || row['district'],
+                    distance_km: row['Distance'] || row['distance_km'],
+                    product_id: product.id
+                };
+
+                if (!mappedData.to_place || !mappedData.distance_km) continue;
+
+                try {
+                    await placeAPI.create(mappedData);
+                    successCount++;
+                } catch (err) {
+                    errors.push(mappedData.to_place);
+                }
+            }
+
+            setSuccessMsg(`Imported ${successCount} routes successfully.`);
+            if (errors.length > 0) alert(`Failed to import: ${errors.join(', ')}`);
+            loadData();
+        } catch (err) {
+            setError('Import failed');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const exportColumns = [
+        { header: 'Pass Company', dataKey: 'company_name' },
+        { header: 'From', dataKey: 'from_place' },
+        { header: 'To', dataKey: 'to_place' },
+        { header: 'District', dataKey: 'district' },
+        { header: 'Distance (KM)', dataKey: 'distance_km' },
+        { header: 'Product', dataKey: 'product_name' },
+    ];
+
     const handleOpenModal = (mode, place = null) => {
         setModalMode(mode);
         setSelectedPlace(place);
@@ -162,13 +219,22 @@ const PlaceList = () => {
                         </CardTitle>
                         <p className="text-sm text-slate-500">Define transportation routes and distance mappings</p>
                     </div>
-                    <Button
-                        onClick={() => handleOpenModal('add')}
-                        className="bg-orange-600 hover:bg-orange-700 shadow-lg shadow-orange-200"
-                    >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add New Route
-                    </Button>
+                    <div className="flex items-center gap-3">
+                        <DataToolbar
+                            onImport={handleImport}
+                            data={places}
+                            columns={exportColumns}
+                            title="Place Master Report"
+                            fileName="places_list"
+                        />
+                        <Button
+                            onClick={() => handleOpenModal('add')}
+                            className="bg-orange-600 hover:bg-orange-700 shadow-lg shadow-orange-200"
+                        >
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add New Route
+                        </Button>
+                    </div>
                 </CardHeader>
 
                 <CardContent className="pt-6">

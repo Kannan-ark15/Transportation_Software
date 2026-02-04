@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import DataToolbar from './common/DataToolbar';
 import { dealerAPI, placeAPI } from '../services/api';
 import Pagination from './Pagination';
 import {
@@ -80,6 +81,61 @@ const DealerList = () => {
         } catch (err) { setError('Failed to load dealer data'); }
         finally { setLoading(false); }
     };
+
+    const handleImport = async (importedData) => {
+        try {
+            setLoading(true);
+            let successCount = 0;
+            let errors = [];
+
+            for (const row of importedData) {
+                const placeName = row['Place'] || row['place'] || row['place_name'];
+                const place = places.find(p => p.to_place?.toLowerCase() === placeName?.toLowerCase());
+
+                if (!place) {
+                    errors.push(`${row['Dealer Name'] || 'Unknown Dealer'} (Place not found: ${placeName})`);
+                    continue;
+                }
+
+                const mappedData = {
+                    place_id: place.id,
+                    district: place.district, // Auto-fill
+                    dealer_name: row['Dealer Name'] || row['dealer_name'],
+                    gst_no: row['GST No'] || row['gst_no'],
+                    contact_no_1: row['Contact 1'] || row['contact_no_1'],
+                    contact_no_2: row['Contact 2'] || row['contact_no_2'] || '',
+                    sales_area: row['Sales Area'] || row['sales_area'],
+                    sales_officer_no: row['Sales Officer No'] || row['sales_officer_no']
+                };
+
+                if (!mappedData.dealer_name || !mappedData.gst_no) continue;
+
+                try {
+                    await dealerAPI.create(mappedData);
+                    successCount++;
+                } catch (err) {
+                    errors.push(mappedData.dealer_name);
+                }
+            }
+
+            setSuccessMsg(`Imported ${successCount} dealers successfully.`);
+            if (errors.length > 0) alert(`Failed to import: ${errors.join(', ')}`);
+            loadData();
+        } catch (err) {
+            setError('Import failed');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const exportColumns = [
+        { header: 'Dealer Name', dataKey: 'dealer_name' },
+        { header: 'Pass Place', dataKey: 'place_name' }, // Assuming API returns mapped name
+        { header: 'District', dataKey: 'district' },
+        { header: 'GST No', dataKey: 'gst_no' },
+        { header: 'Sales Area', dataKey: 'sales_area' },
+        { header: 'Contact', dataKey: 'contact_no_1' },
+    ];
 
     const handleOpenModal = (mode, dealer = null) => {
         setModalMode(mode);
@@ -163,13 +219,22 @@ const DealerList = () => {
                         </CardTitle>
                         <p className="text-sm text-slate-500">Manage business partners and distribution points</p>
                     </div>
-                    <Button
-                        onClick={() => handleOpenModal('add')}
-                        className="bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-200"
-                    >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add New Dealer
-                    </Button>
+                    <div className="flex items-center gap-3">
+                        <DataToolbar
+                            onImport={handleImport}
+                            data={dealers}
+                            columns={exportColumns}
+                            title="Dealer Master Report"
+                            fileName="dealers_list"
+                        />
+                        <Button
+                            onClick={() => handleOpenModal('add')}
+                            className="bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-200"
+                        >
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add New Dealer
+                        </Button>
+                    </div>
                 </CardHeader>
 
                 <CardContent className="pt-6">

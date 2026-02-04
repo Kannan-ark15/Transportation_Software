@@ -54,7 +54,11 @@ const Sidebar = () => {
                 { label: 'Driver Master', path: '/masters/drivers' },
                 { label: 'Pump Master', path: '/masters/pumps' },
                 { label: 'Place Master', path: '/masters/places' },
-                { label: 'Dealer Master', path: '/masters/dealers' }
+                { label: 'Dealer Master', path: '/masters/dealers' },
+                { label: 'Vehicle Master', path: '/masters/vehicles' },
+                { label: 'Owner Master', path: '/masters/owners' },
+                { label: 'Bank Master', path: '/masters/banks' },
+                { label: 'Rate Card Master', path: '/masters/rate-cards' }
             ]
         },
         {

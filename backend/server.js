@@ -8,6 +8,10 @@ const driverRoutes = require('./routes/driverRoutes');
 const pumpRoutes = require('./routes/pumpRoutes');
 const placeRoutes = require('./routes/placeRoutes');
 const dealerRoutes = require('./routes/dealerRoutes');
+const vehicleRoutes = require('./routes/vehicleRoutes');
+const ownerRoutes = require('./routes/ownerRoutes');
+const bankRoutes = require('./routes/bankRoutes');
+const rateCardRoutes = require('./routes/rateCardRoutes');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
 
 const app = express();
@@ -43,6 +47,10 @@ app.use('/api/drivers', driverRoutes);
 app.use('/api/pumps', pumpRoutes);
 app.use('/api/places', placeRoutes);
 app.use('/api/dealers', dealerRoutes);
+app.use('/api/vehicles', vehicleRoutes);
+app.use('/api/owners', ownerRoutes);
+app.use('/api/banks', bankRoutes);
+app.use('/api/rate-cards', rateCardRoutes);
 
 // 404 handler
 app.use(notFound);

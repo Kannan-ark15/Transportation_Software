@@ -23,12 +23,15 @@
         "axios": "^1.6.2",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
+        "jspdf": "^4.1.0",
+        "jspdf-autotable": "^5.0.7",
         "lucide-react": "^0.563.0",
         "react": "^18.2.0",
         "react-dom": "^18.2.0",
         "react-router-dom": "^6.20.1",
         "tailwind-merge": "^3.4.0",
-        "tailwindcss-animate": "^1.0.7"
+        "tailwindcss-animate": "^1.0.7",
+        "xlsx": "^0.18.5"
     },
     "devDependencies": {
         "@tailwindcss/postcss": "^4.1.18",

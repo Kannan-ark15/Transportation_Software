@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import DataToolbar from './common/DataToolbar';
 import { driverAPI } from '../services/api';
 import Pagination from './Pagination';
 import {
@@ -84,6 +85,71 @@ const DriverList = () => {
         finally { setLoading(false); }
     };
 
+    const handleImport = async (importedData) => {
+        try {
+            setLoading(true);
+            let successCount = 0;
+            let errors = [];
+
+            // Helper to parse dates
+            const parseDate = (val) => {
+                if (!val) return null;
+                if (val instanceof Date) return val.toISOString().split('T')[0];
+                if (typeof val === 'number') {
+                    // Excel number to date
+                    const date = new Date(Math.round((val - 25569) * 86400 * 1000));
+                    return date.toISOString().split('T')[0];
+                }
+                const date = new Date(val);
+                if (!isNaN(date.getTime())) return date.toISOString().split('T')[0];
+                return null;
+            };
+
+            for (const row of importedData) {
+                const mappedData = {
+                    driver_name: row['Driver Name'] || row['driver_name'],
+                    primary_contact_no: row['Primary Contact'] || row['primary_contact_no'],
+                    secondary_contact_no: row['Secondary Contact'] || row['secondary_contact_no'] || '',
+                    blood_group: row['Blood Group'] || row['blood_group'] || 'O+',
+                    address: row['Address'] || row['address'],
+                    license_no: row['License No'] || row['license_no'],
+                    license_exp_date: parseDate(row['License Expiry']) || parseDate(row['license_exp_date']),
+                    aadhar_no: row['Aadhar No'] || row['aadhar_no'],
+                    bank_name: row['Bank Name'] || row['bank_name'],
+                    branch: row['Branch'] || row['branch'],
+                    account_number: row['Account No'] || row['account_number'],
+                    ifsc_code: row['IFSC'] || row['ifsc_code'],
+                    driver_status: true
+                };
+
+                if (!mappedData.driver_name || !mappedData.primary_contact_no || !mappedData.license_no) continue;
+
+                try {
+                    await driverAPI.create(mappedData);
+                    successCount++;
+                } catch (err) {
+                    errors.push(mappedData.driver_name);
+                }
+            }
+
+            setSuccessMsg(`Imported ${successCount} drivers successfully.`);
+            if (errors.length > 0) alert(`Failed to import: ${errors.join(', ')}`);
+            loadDrivers();
+        } catch (err) {
+            setError('Import failed');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const exportColumns = [
+        { header: 'Driver ID', dataKey: 'driver_id' },
+        { header: 'Name', dataKey: 'driver_name' },
+        { header: 'Contact', dataKey: 'primary_contact_no' },
+        { header: 'License No', dataKey: 'license_no' },
+        { header: 'Status', dataKey: 'driver_status' },
+    ];
+
     const handleOpenModal = (mode, driver = null) => {
         setModalMode(mode);
         setSelectedDriver(driver);
@@ -166,13 +232,22 @@ const DriverList = () => {
                         </CardTitle>
                         <p className="text-sm text-slate-500">Manage fleet operators and their documentation</p>
                     </div>
-                    <Button
-                        onClick={() => handleOpenModal('add')}
-                        className="bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-200"
-                    >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add New Driver
-                    </Button>
+                    <div className="flex items-center gap-3">
+                        <DataToolbar
+                            onImport={handleImport}
+                            data={drivers}
+                            columns={exportColumns}
+                            title="Driver Master Report"
+                            fileName="drivers_list"
+                        />
+                        <Button
+                            onClick={() => handleOpenModal('add')}
+                            className="bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-200"
+                        >
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add New Driver
+                        </Button>
+                    </div>
                 </CardHeader>
 
                 <CardContent className="pt-6">

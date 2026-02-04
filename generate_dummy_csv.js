@@ -1,0 +1,44 @@
+const fs = require('fs');
+const path = require('path');
+
+const headers = [
+    "Vehicle No", "Type", "Sub Type", "Body Type", "Brand", "Category", "Owner",
+    "Recommended KM", "Year", "Engine No", "Chasis No",
+    "RC Expiry", "Pollution No", "Pollution Expiry",
+    "Permit No", "Permit From", "Permit Till",
+    "FC No", "FC From", "FC Till",
+    "Insurance No", "Insurance Base Value", "GST %", "Insurance Amount"
+];
+
+const data = [
+    [
+        "TN01AB1111", "LCV", "6 WHEELER", "Open Container", "Tata", "Own", "Admin Services",
+        "100", "2022", "ENG1001", "CHS1001",
+        "2026-12-31", "PUC1001", "2025-06-30",
+        "PER1001", "2023-01-01", "2028-01-01",
+        "FC1001", "2024-01-01", "2026-01-01",
+        "INS1001", "50000", "18", "59000"
+    ],
+    [
+        "TN02CD2222", "HCV", "14 WHEELER", "Container", "Ashok Leyland", "Dedicated", "External Partner A",
+        "200", "2023", "ENG2002", "CHS2002",
+        "2027-12-31", "PUC2002", "2025-12-31",
+        "PER2002", "2023-05-01", "2028-05-01",
+        "FC2002", "2024-05-01", "2026-05-01",
+        "INS2002", "80000", "18", "94400"
+    ]
+];
+
+const csvContent = [
+    headers.join(','),
+    ...data.map(row => row.join(','))
+].join('\n');
+
+const filePath = path.join('d:', 'Transport', 'vehicle_dummy_import.csv');
+
+try {
+    fs.writeFileSync(filePath, csvContent);
+    console.log(`Dummy CSV file created successfully at: ${filePath}`);
+} catch (err) {
+    console.error("Failed to write CSV file:", err);
+}

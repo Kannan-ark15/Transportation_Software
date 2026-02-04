@@ -8,6 +8,10 @@ import DriverList from './components/DriverList';
 import PumpList from './components/PumpList';
 import PlaceList from './components/PlaceList';
 import DealerList from './components/DealerList';
+import VehicleList from './components/VehicleList';
+import OwnerList from './components/OwnerList';
+import BankList from './components/BankList';
+import RateCardList from './components/RateCardList';
 
 function App() {
     return (
@@ -22,6 +26,10 @@ function App() {
                         <Route path="/masters/pumps" element={<PumpList />} />
                         <Route path="/masters/places" element={<PlaceList />} />
                         <Route path="/masters/dealers" element={<DealerList />} />
+                        <Route path="/masters/vehicles" element={<VehicleList />} />
+                        <Route path="/masters/owners" element={<OwnerList />} />
+                        <Route path="/masters/banks" element={<BankList />} />
+                        <Route path="/masters/rate-cards" element={<RateCardList />} />
                         <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
                 </Layout>

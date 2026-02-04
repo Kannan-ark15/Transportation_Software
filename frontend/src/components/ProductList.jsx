@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import DataToolbar from './common/DataToolbar';
 import { productAPI } from '../services/api';
 import Pagination from './Pagination';
 import {
@@ -74,6 +75,43 @@ const ProductList = () => {
         }
     };
 
+    const handleImport = async (importedData) => {
+        try {
+            setLoading(true);
+            let successCount = 0;
+            let errors = [];
+
+            for (const row of importedData) {
+                const mappedData = {
+                    product_name: row['Product Name'] || row['product_name'],
+                    measuring_unit: row['Measuring Unit'] || row['measuring_unit'] || 'Tons'
+                };
+
+                if (!mappedData.product_name) continue;
+
+                try {
+                    await productAPI.create(mappedData);
+                    successCount++;
+                } catch (err) {
+                    errors.push(mappedData.product_name);
+                }
+            }
+
+            setSuccessMsg(`Imported ${successCount} products successfully.`);
+            if (errors.length > 0) alert(`Failed to import: ${errors.join(', ')}`);
+            loadProducts();
+        } catch (err) {
+            setError('Import failed');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const exportColumns = [
+        { header: 'Product Name', dataKey: 'product_name' },
+        { header: 'Measuring Unit', dataKey: 'measuring_unit' },
+    ];
+
     const handleOpenModal = (mode, product = null) => {
         setModalMode(mode);
         setSelectedProduct(product);
@@ -146,13 +184,22 @@ const ProductList = () => {
                         </CardTitle>
                         <p className="text-sm text-slate-500">Manage your transport goods and materials</p>
                     </div>
-                    <Button
-                        onClick={() => handleOpenModal('add')}
-                        className="bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-200"
-                    >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add New Product
-                    </Button>
+                    <div className="flex items-center gap-3">
+                        <DataToolbar
+                            onImport={handleImport}
+                            data={products}
+                            columns={exportColumns}
+                            title="Product Master Report"
+                            fileName="products_list"
+                        />
+                        <Button
+                            onClick={() => handleOpenModal('add')}
+                            className="bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-200"
+                        >
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add New Product
+                        </Button>
+                    </div>
                 </CardHeader>
 
                 <CardContent className="pt-6">

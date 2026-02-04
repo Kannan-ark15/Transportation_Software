@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import DataToolbar from './common/DataToolbar';
 import { companyAPI } from '../services/api';
 import ViewCompanyModal from './ViewCompanyModal';
 import Pagination from './Pagination';
@@ -80,6 +81,52 @@ const CompanyList = () => {
         } catch (err) { setError('Failed to load companies'); }
         finally { setLoading(false); }
     };
+
+    const handleImport = async (importedData) => {
+        try {
+            setLoading(true);
+            let successCount = 0;
+            let errors = [];
+
+            for (const row of importedData) {
+                const mappedData = {
+                    company_name: row['Company Name'] || row['company_name'],
+                    place: row['Place'] || row['place'],
+                    company_address_1: row['Address 1'] || row['company_address_1'],
+                    company_address_2: row['Address 2'] || row['company_address_2'] || '',
+                    gst_no: row['GST No'] || row['gst_no'],
+                    pin_code: row['PIN Code'] || row['pin_code'],
+                    contact_no: row['Contact No'] || row['contact_no'],
+                    email_id: row['Email ID'] || row['email_id']
+                };
+
+                if (!mappedData.company_name) continue;
+
+                try {
+                    await companyAPI.create(mappedData);
+                    successCount++;
+                } catch (err) {
+                    errors.push(mappedData.company_name);
+                }
+            }
+
+            setSuccessMsg(`Imported ${successCount} companies successfully.`);
+            if (errors.length > 0) alert(`Failed to import: ${errors.join(', ')}`);
+            loadCompanies();
+        } catch (err) {
+            setError('Import failed');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const exportColumns = [
+        { header: 'Company Name', dataKey: 'company_name' },
+        { header: 'Place', dataKey: 'place' },
+        { header: 'GST No', dataKey: 'gst_no' },
+        { header: 'Contact', dataKey: 'contact_no' },
+        { header: 'Email', dataKey: 'email_id' },
+    ];
 
     const handleOpenModal = (mode, company = null) => {
         setModalMode(mode);
@@ -183,13 +230,22 @@ const CompanyList = () => {
                         </CardTitle>
                         <p className="text-sm text-slate-500">Manage transport companies and corporate profiles</p>
                     </div>
-                    <Button
-                        onClick={() => handleOpenModal('add')}
-                        className="bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-200"
-                    >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add New Company
-                    </Button>
+                    <div className="flex items-center gap-3">
+                        <DataToolbar
+                            onImport={handleImport}
+                            data={companies}
+                            columns={exportColumns}
+                            title="Company Master Report"
+                            fileName="companies_list"
+                        />
+                        <Button
+                            onClick={() => handleOpenModal('add')}
+                            className="bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-200"
+                        >
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add New Company
+                        </Button>
+                    </div>
                 </CardHeader>
 
                 <CardContent className="pt-6">

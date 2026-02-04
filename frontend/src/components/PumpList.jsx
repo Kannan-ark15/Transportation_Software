@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import DataToolbar from './common/DataToolbar';
 import { pumpAPI } from '../services/api';
 import Pagination from './Pagination';
 import {
@@ -74,6 +75,58 @@ const PumpList = () => {
         finally { setLoading(false); }
     };
 
+    const handleImport = async (importedData) => {
+        try {
+            setLoading(true);
+            let successCount = 0;
+            let errors = [];
+
+            for (const row of importedData) {
+                const mappedData = {
+                    pump_name: row['Pump Name'] || row['pump_name'],
+                    rate: row['Rate'] || row['rate'],
+                    contact_person: row['Contact Person'] || row['contact_person'],
+                    contact_no: row['Contact No'] || row['contact_no'],
+                    email_id: row['Email ID'] || row['email_id'],
+                    company_address_1: row['Address 1'] || row['company_address_1'],
+                    company_address_2: row['Address 2'] || row['company_address_2'] || '',
+                    place: row['Place'] || row['place'],
+                    pan_no: row['PAN No'] || row['pan_no'],
+                    gst_no: row['GST No'] || row['gst_no'],
+                    bank_name: row['Bank Name'] || row['bank_name'],
+                    branch: row['Branch'] || row['branch'],
+                    account_number: row['Account No'] || row['account_number'],
+                    ifsc_code: row['IFSC'] || row['ifsc_code']
+                };
+
+                if (!mappedData.pump_name || !mappedData.rate) continue;
+
+                try {
+                    await pumpAPI.create(mappedData);
+                    successCount++;
+                } catch (err) {
+                    errors.push(mappedData.pump_name);
+                }
+            }
+
+            setSuccessMsg(`Imported ${successCount} pumps successfully.`);
+            if (errors.length > 0) alert(`Failed to import: ${errors.join(', ')}`);
+            loadPumps();
+        } catch (err) {
+            setError('Import failed');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const exportColumns = [
+        { header: 'Pass Name', dataKey: 'pump_name' },
+        { header: 'Rate', dataKey: 'rate' },
+        { header: 'Place', dataKey: 'place' },
+        { header: 'Contact Person', dataKey: 'contact_person' },
+        { header: 'Contact No', dataKey: 'contact_no' },
+    ];
+
     const handleOpenModal = (mode, pump = null) => {
         setModalMode(mode);
         setSelectedPump(pump);
@@ -142,13 +195,22 @@ const PumpList = () => {
                         </CardTitle>
                         <p className="text-sm text-slate-500">Manage fuel supply stations and service rates</p>
                     </div>
-                    <Button
-                        onClick={() => handleOpenModal('add')}
-                        className="bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-200"
-                    >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add New Pump
-                    </Button>
+                    <div className="flex items-center gap-3">
+                        <DataToolbar
+                            onImport={handleImport}
+                            data={pumps}
+                            columns={exportColumns}
+                            title="Pump Master Report"
+                            fileName="pumps_list"
+                        />
+                        <Button
+                            onClick={() => handleOpenModal('add')}
+                            className="bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-200"
+                        >
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add New Pump
+                        </Button>
+                    </div>
                 </CardHeader>
 
                 <CardContent className="pt-6">
