@@ -1,5 +1,17 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+    Truck,
+    ClipboardList,
+    Zap,
+    ChevronRight,
+    Building2,
+    BarChart3,
+    ArrowUpRight
+} from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 const Dashboard = () => {
     const navigate = useNavigate();
@@ -8,82 +20,100 @@ const Dashboard = () => {
         {
             label: 'Active Vehicles',
             value: '510',
-            icon: (
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-            ),
-            variant: 'primary'
+            icon: <Truck className="w-6 h-6" />,
+            color: "text-blue-600",
+            bg: "bg-blue-100",
+            trend: "+12.5% from last month",
+            trendColor: "text-green-600"
         },
         {
             label: 'Daily Transactions',
             value: '520',
-            icon: (
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-            ),
-            variant: 'dark'
+            icon: <ClipboardList className="w-6 h-6" />,
+            color: "text-purple-600",
+            bg: "bg-purple-100",
+            trend: "+4.2% from last week",
+            trendColor: "text-green-600"
         },
         {
             label: 'Fuel Efficiency',
-            value: '900',
-            icon: (
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-            ),
-            variant: 'success'
+            value: '94%',
+            icon: <Zap className="w-6 h-6" />,
+            color: "text-amber-600",
+            bg: "bg-amber-100",
+            trend: "-0.8% from yesterday",
+            trendColor: "text-red-600"
         }
     ];
 
     return (
-        <div className="dashboard">
-            <div className="dashboard-cards">
+        <div className="space-y-8 animate-in fade-in duration-500">
+            <div>
+                <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Dashboard Overview</h1>
+                <p className="text-slate-500 mt-2">Welcome back! Here's what's happening with your transport fleet today.</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {stats.map((stat, index) => (
-                    <div key={index} className={`stat-card ${stat.variant}`}>
-                        <div className="stat-label">{stat.label}</div>
-                        <div className="stat-value">{stat.value}</div>
-                        <div className="stat-icon">{stat.icon}</div>
-                    </div>
+                    <Card key={index} className="border-none shadow-sm hover:shadow-md transition-shadow duration-200">
+                        <CardContent className="p-6">
+                            <div className="flex items-center justify-between">
+                                <div className={cn("p-3 rounded-xl", stat.bg, stat.color)}>
+                                    {stat.icon}
+                                </div>
+                                <div className={cn("flex items-center gap-1 text-xs font-medium", stat.trendColor)}>
+                                    {stat.trend}
+                                    <ArrowUpRight className="w-3 h-3" />
+                                </div>
+                            </div>
+                            <div className="mt-4">
+                                <h3 className="text-slate-500 text-sm font-medium">{stat.label}</h3>
+                                <div className="text-3xl font-bold text-slate-900 mt-1">{stat.value}</div>
+                            </div>
+                        </CardContent>
+                    </Card>
                 ))}
             </div>
 
-            <div className="card">
-                <div className="card-header">
-                    <h2 className="card-title">Quick Actions</h2>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-                    <button
-                        className="btn btn-primary"
-                        onClick={() => navigate('/masters/company')}
-                        style={{ padding: '20px' }}
-                    >
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '24px', height: '24px' }}>
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                        </svg>
-                        Company Master
-                    </button>
-                    <button
-                        className="btn btn-outline"
-                        style={{ padding: '20px' }}
-                    >
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '24px', height: '24px' }}>
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                        Transactions
-                    </button>
-                    <button
-                        className="btn btn-outline"
-                        style={{ padding: '20px' }}
-                    >
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '24px', height: '24px' }}>
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                        </svg>
-                        Reports
-                    </button>
-                </div>
-            </div>
+            <Card className="border-none shadow-sm">
+                <CardHeader>
+                    <CardTitle className="text-xl font-bold">Quick Actions</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <Button
+                            variant="outline"
+                            className="h-32 flex flex-col gap-3 group border-slate-200 hover:border-blue-500 hover:bg-blue-50 transition-all"
+                            onClick={() => navigate('/masters/company')}
+                        >
+                            <div className="p-3 bg-slate-100 rounded-full group-hover:bg-blue-100 transition-colors">
+                                <Building2 className="w-6 h-6 text-slate-600 group-hover:text-blue-600" />
+                            </div>
+                            <span className="font-semibold text-slate-700 group-hover:text-blue-700">Company Master</span>
+                        </Button>
+
+                        <Button
+                            variant="outline"
+                            className="h-32 flex flex-col gap-3 group border-slate-200 hover:border-purple-500 hover:bg-purple-50 transition-all"
+                        >
+                            <div className="p-3 bg-slate-100 rounded-full group-hover:bg-purple-100 transition-colors">
+                                <ClipboardList className="w-6 h-6 text-slate-600 group-hover:text-purple-600" />
+                            </div>
+                            <span className="font-semibold text-slate-700 group-hover:text-purple-700">New Transaction</span>
+                        </Button>
+
+                        <Button
+                            variant="outline"
+                            className="h-32 flex flex-col gap-3 group border-slate-200 hover:border-amber-500 hover:bg-amber-50 transition-all"
+                        >
+                            <div className="p-3 bg-slate-100 rounded-full group-hover:bg-amber-100 transition-colors">
+                                <BarChart3 className="w-6 h-6 text-slate-600 group-hover:text-amber-600" />
+                            </div>
+                            <span className="font-semibold text-slate-700 group-hover:text-amber-700">View Reports</span>
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
         </div>
     );
 };

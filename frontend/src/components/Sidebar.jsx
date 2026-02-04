@@ -1,30 +1,52 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import {
+    LayoutDashboard,
+    Settings,
+    ChevronRight,
+    Database,
+    FileText,
+    ClipboardList,
+    BarChart3,
+    Truck
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import {
+    Sidebar as ShadcnSidebar,
+    SidebarContent,
+    SidebarFooter,
+    SidebarHeader,
+    SidebarMenu,
+    SidebarMenuButton,
+    SidebarMenuItem,
+    SidebarMenuSub,
+    SidebarMenuSubButton,
+    SidebarMenuSubItem,
+    SidebarGroup,
+    SidebarGroupLabel,
+    SidebarGroupContent,
+} from "@/components/ui/sidebar";
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
-const Sidebar = ({ isOpen, onClose }) => {
+const Sidebar = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    const [mastersExpanded, setMastersExpanded] = useState(true);
 
     const menuItems = [
         {
             id: 'dashboard',
             label: 'Dashboard',
-            icon: (
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                </svg>
-            ),
+            icon: <LayoutDashboard className="w-5 h-5" />,
             path: '/'
         },
         {
             id: 'masters',
             label: 'Masters',
-            icon: (
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                </svg>
-            ),
+            icon: <Database className="w-5 h-5" />,
             hasSubmenu: true,
             submenu: [
                 { label: 'Company Master', path: '/masters/company' },
@@ -38,117 +60,147 @@ const Sidebar = ({ isOpen, onClose }) => {
         {
             id: 'transactions',
             label: 'Transactions',
-            icon: (
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-            ),
+            icon: <ClipboardList className="w-5 h-5" />,
             path: '#'
         },
         {
             id: 'templates',
             label: 'Templates',
-            icon: (
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-            ),
+            icon: <FileText className="w-5 h-5" />,
             path: '#'
         },
         {
             id: 'reports',
             label: 'Reports',
-            icon: (
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-            ),
+            icon: <BarChart3 className="w-5 h-5" />,
             path: '#'
         },
         {
             id: 'settings',
             label: 'Settings',
-            icon: (
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-            ),
+            icon: <Settings className="w-5 h-5" />,
             path: '#'
         }
     ];
-
-    const handleNavClick = (item) => {
-        if (item.hasSubmenu) {
-            setMastersExpanded(!mastersExpanded);
-        } else if (item.path !== '#') {
-            navigate(item.path);
-            if (window.innerWidth < 768) {
-                onClose();
-            }
-        }
-    };
-
-    const handleSubmenuClick = (path) => {
-        navigate(path);
-        if (window.innerWidth < 768) {
-            onClose();
-        }
-    };
 
     const isActive = (path) => {
         return location.pathname === path;
     };
 
+    const isSubmenuActive = (submenu) => {
+        return submenu.some(item => location.pathname === item.path);
+    };
+
     return (
-        <div className={`sidebar ${!isOpen ? 'collapsed' : ''}`}>
-            <div className="sidebar-header">
-                <div className="sidebar-brand">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                    Transport System
+        <ShadcnSidebar collapsible="icon" className="border-r border-slate-800 bg-slate-900 text-slate-300">
+            <SidebarHeader className="p-6 border-b border-slate-800">
+                <div className="flex items-center gap-3">
+                    <Truck className="w-8 h-8 text-blue-500" />
+                    <span className="text-xl font-bold text-white tracking-tight group-data-[collapsible=icon]:hidden">
+                        Transport
+                    </span>
                 </div>
-            </div>
+            </SidebarHeader>
 
-            <nav className="sidebar-nav">
-                {menuItems.map((item) => (
-                    <div key={item.id} className="nav-item">
-                        <div
-                            className={`nav-link ${isActive(item.path) ? 'active' : ''}`}
-                            onClick={() => handleNavClick(item)}
-                        >
-                            {item.icon}
-                            <span className="nav-link-text">{item.label}</span>
-                            {item.hasSubmenu && (
-                                <svg
-                                    className={`nav-arrow ${mastersExpanded ? 'expanded' : ''}`}
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                </svg>
-                            )}
-                        </div>
+            <SidebarContent className="py-6">
+                <SidebarGroup>
+                    <SidebarGroupLabel className="text-slate-400 px-4 group-data-[collapsible=icon]:hidden">
+                        Main Menu
+                    </SidebarGroupLabel>
+                    <SidebarGroupContent>
+                        <SidebarMenu>
+                            {menuItems.map((item) => (
+                                <SidebarMenuItem key={item.id}>
+                                    {item.hasSubmenu ? (
+                                        <Collapsible
+                                            defaultOpen={isSubmenuActive(item.submenu)}
+                                            className="group/collapsible w-full"
+                                        >
+                                            <CollapsibleTrigger asChild>
+                                                <SidebarMenuButton
+                                                    tooltip={item.label}
+                                                    className={cn(
+                                                        "w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-sm font-medium",
+                                                        isSubmenuActive(item.submenu) ? "text-white bg-slate-800" : "text-slate-400 hover:bg-slate-800 hover:text-white"
+                                                    )}
+                                                >
+                                                    {item.icon}
+                                                    <span>{item.label}</span>
+                                                    <ChevronRight className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                                                </SidebarMenuButton>
+                                            </CollapsibleTrigger>
+                                            <CollapsibleContent>
+                                                <SidebarMenuSub className="border-l border-slate-800 ml-6 mt-1">
+                                                    {item.submenu.map((subItem) => (
+                                                        <SidebarMenuSubItem key={subItem.path}>
+                                                            <SidebarMenuSubButton
+                                                                asChild
+                                                                isActive={isActive(subItem.path)}
+                                                            >
+                                                                <a
+                                                                    href={subItem.path}
+                                                                    onClick={(e) => {
+                                                                        e.preventDefault();
+                                                                        navigate(subItem.path);
+                                                                    }}
+                                                                    className={cn(
+                                                                        "w-full text-sm py-2 px-3 rounded-md transition-colors",
+                                                                        isActive(subItem.path)
+                                                                            ? "text-blue-400 font-semibold bg-blue-400/10"
+                                                                            : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                                                                    )}
+                                                                >
+                                                                    {subItem.label}
+                                                                </a>
+                                                            </SidebarMenuSubButton>
+                                                        </SidebarMenuSubItem>
+                                                    ))}
+                                                </SidebarMenuSub>
+                                            </CollapsibleContent>
+                                        </Collapsible>
+                                    ) : (
+                                        <SidebarMenuButton
+                                            asChild
+                                            isActive={isActive(item.path)}
+                                            tooltip={item.label}
+                                            className={cn(
+                                                "w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-sm font-medium",
+                                                isActive(item.path)
+                                                    ? "bg-blue-600 text-white shadow-lg shadow-blue-900/20"
+                                                    : "text-slate-400 hover:bg-slate-800 hover:text-white"
+                                            )}
+                                        >
+                                            <a
+                                                href={item.path}
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    if (item.path !== '#') navigate(item.path);
+                                                }}
+                                            >
+                                                {item.icon}
+                                                <span>{item.label}</span>
+                                            </a>
+                                        </SidebarMenuButton>
+                                    )}
+                                </SidebarMenuItem>
+                            ))}
+                        </SidebarMenu>
+                    </SidebarGroupContent>
+                </SidebarGroup>
+            </SidebarContent>
 
-                        {item.hasSubmenu && (
-                            <div className={`submenu ${mastersExpanded ? 'expanded' : ''}`}>
-                                {item.submenu.map((subItem, index) => (
-                                    <div
-                                        key={index}
-                                        className={`submenu-item ${isActive(subItem.path) ? 'active' : ''}`}
-                                        onClick={() => handleSubmenuClick(subItem.path)}
-                                    >
-                                        {subItem.label}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
+            <SidebarFooter className="p-4 border-t border-slate-800">
+                <div className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
+                    <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-semibold">
+                        A
                     </div>
-                ))}
-            </nav>
-        </div>
+                    <div className="text-left group-data-[collapsible=icon]:hidden">
+                        <p className="text-sm font-medium text-white leading-none">Admin User</p>
+                        <p className="text-xs text-slate-500 mt-1">Administrator</p>
+                    </div>
+                </div>
+            </SidebarFooter>
+        </ShadcnSidebar>
     );
 };
 

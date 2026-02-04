@@ -1,234 +1,474 @@
 import React, { useState, useEffect } from 'react';
 import { companyAPI } from '../services/api';
 import ViewCompanyModal from './ViewCompanyModal';
-import EditCompanyModal from './EditCompanyModal';
-import AddCompanyModal from './AddCompanyModal';
 import Pagination from './Pagination';
+import {
+    Plus,
+    Search,
+    Eye,
+    Edit,
+    Trash2,
+    Building2,
+    MapPin,
+    Phone,
+    Mail,
+    SearchX,
+    Loader2,
+    Globe,
+    FileText,
+    Hash
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow
+} from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Separator } from '@/components/ui/separator';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+} from "@/components/ui/dialog";
+import { cn } from '@/lib/utils';
 
 const CompanyList = () => {
     const [companies, setCompanies] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [deleteSuccess, setDeleteSuccess] = useState('');
+    const [successMsg, setSuccessMsg] = useState('');
 
-    // Pagination state
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
 
-    // Modal state
-    const [viewModalOpen, setViewModalOpen] = useState(false);
-    const [editModalOpen, setEditModalOpen] = useState(false);
-    const [addModalOpen, setAddModalOpen] = useState(false);
+    const [modalOpen, setModalOpen] = useState(false);
+    const [modalMode, setModalMode] = useState('add');
     const [selectedCompany, setSelectedCompany] = useState(null);
+    const [viewModalOpen, setViewModalOpen] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
 
-    useEffect(() => {
-        loadCompanies();
-    }, []);
+    const [formData, setFormData] = useState({
+        company_name: '',
+        place: '',
+        company_address_1: '',
+        company_address_2: '',
+        gst_no: '',
+        pin_code: '',
+        contact_no: '',
+        email_id: ''
+    });
+
+    const [formErrors, setFormErrors] = useState({});
+
+    useEffect(() => { loadCompanies(); }, []);
 
     const loadCompanies = async () => {
         try {
             setLoading(true);
-            setError('');
-            const response = await companyAPI.getAll();
-            if (response.success) {
-                setCompanies(response.data);
-            }
-        } catch (err) {
-            setError('Failed to load companies. Please try again.');
-            console.error('Error loading companies:', err);
-        } finally {
-            setLoading(false);
-        }
+            const res = await companyAPI.getAll();
+            if (res.success) setCompanies(res.data);
+        } catch (err) { setError('Failed to load companies'); }
+        finally { setLoading(false); }
     };
 
-    const handleDelete = async (id, companyName) => {
-        if (!window.confirm(`Are you sure you want to delete "${companyName}"?`)) {
-            return;
+    const handleOpenModal = (mode, company = null) => {
+        setModalMode(mode);
+        setSelectedCompany(company);
+        setFormErrors({});
+        if (company) {
+            setFormData({
+                company_name: company.company_name,
+                place: company.place,
+                company_address_1: company.company_address_1,
+                company_address_2: company.company_address_2 || '',
+                gst_no: company.gst_no,
+                pin_code: company.pin_code,
+                contact_no: company.contact_no,
+                email_id: company.email_id
+            });
+        } else {
+            setFormData({
+                company_name: '',
+                place: '',
+                company_address_1: '',
+                company_address_2: '',
+                gst_no: '',
+                pin_code: '',
+                contact_no: '',
+                email_id: ''
+            });
         }
+        setModalOpen(true);
+    };
+
+    const validate = () => {
+        const errors = {};
+        if (!formData.company_name.trim()) errors.company_name = 'Required';
+        if (!formData.place.trim()) errors.place = 'Required';
+        if (!formData.company_address_1.trim()) errors.company_address_1 = 'Required';
+        if (!formData.gst_no.trim()) errors.gst_no = 'Required';
+        else if (!/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(formData.gst_no)) {
+            errors.gst_no = 'Invalid Format';
+        }
+        if (!formData.pin_code.trim()) errors.pin_code = 'Required';
+        if (!formData.contact_no.trim()) errors.contact_no = 'Required';
+        if (!formData.email_id.trim()) errors.email_id = 'Required';
+
+        setFormErrors(errors);
+        return Object.keys(errors).length === 0;
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!validate()) return;
 
         try {
-            const response = await companyAPI.delete(id);
-            if (response.success) {
-                setDeleteSuccess('Company deleted successfully');
-                setCompanies(companies.filter((company) => company.id !== id));
-                setTimeout(() => setDeleteSuccess(''), 3000);
+            setSubmitting(true);
+            let res;
+            if (modalMode === 'add') res = await companyAPI.create(formData);
+            else res = await companyAPI.update(selectedCompany.id, formData);
+
+            if (res.success) {
+                setSuccessMsg(`Company ${modalMode === 'add' ? 'created' : 'updated'} successfully`);
+                setModalOpen(false);
+                loadCompanies();
+                setTimeout(() => setSuccessMsg(''), 3000);
             }
-        } catch (err) {
-            setError('Failed to delete company. Please try again.');
-            console.error('Error deleting company:', err);
-        }
+        } catch (err) { setError(err.response?.data?.message || 'Operation failed'); }
+        finally { setSubmitting(false); }
     };
 
-    const handleView = (company) => {
-        setSelectedCompany(company);
-        setViewModalOpen(true);
+    const handleDelete = async (id, name) => {
+        if (!window.confirm(`Are you sure you want to delete company "${name}"?`)) return;
+        try {
+            const res = await companyAPI.delete(id);
+            if (res.success) {
+                setSuccessMsg('Company deleted successfully');
+                loadCompanies();
+                setTimeout(() => setSuccessMsg(''), 3000);
+            }
+        } catch (err) { setError('Failed to delete company'); }
     };
 
-    const handleEdit = (company) => {
-        setSelectedCompany(company);
-        setEditModalOpen(true);
-    };
-
-    const handleSuccess = () => {
-        loadCompanies();
-        setDeleteSuccess('Operation successful!');
-        setTimeout(() => setDeleteSuccess(''), 3000);
-    };
-
-    // Calculate pagination
-    const totalItems = companies.length;
     const startIndex = (currentPage - 1) * itemsPerPage;
-    const paginatedCompanies = companies.slice(startIndex, startIndex + itemsPerPage);
+    const paginatedItems = companies.slice(startIndex, startIndex + itemsPerPage);
 
     if (loading) {
         return (
-            <div className="content-wrapper">
-                <div className="loading">
-                    <div className="loading-spinner"></div>
-                    <p>Loading companies...</p>
-                </div>
+            <div className="flex flex-col items-center justify-center min-h-[400px] text-slate-500">
+                <Loader2 className="h-12 w-12 animate-spin text-blue-600 mb-4" />
+                <p className="text-lg font-medium">Loading companies...</p>
             </div>
         );
     }
 
     return (
-        <div className="content-wrapper">
-            <div className="card">
-                <div className="card-header">
-                    <h2 className="card-title">Company Master</h2>
-                    <button
-                        className="btn btn-primary"
-                        onClick={() => setAddModalOpen(true)}
-                    >
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '20px', height: '20px' }}>
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                        </svg>
-                        Add New Company
-                    </button>
-                </div>
-
-                {error && <div className="error-message">{error}</div>}
-                {deleteSuccess && <div className="success-message">{deleteSuccess}</div>}
-
-                {companies.length === 0 ? (
-                    <div className="empty-state">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '64px', height: '64px', marginBottom: '16px', color: 'var(--text-light)' }}>
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                        </svg>
-                        <h3>No Companies Found</h3>
-                        <p>Get started by adding your first company.</p>
-                        <button
-                            className="btn btn-primary"
-                            style={{ marginTop: '20px' }}
-                            onClick={() => setAddModalOpen(true)}
-                        >
-                            Add New Company
-                        </button>
+        <div className="space-y-6">
+            <Card className="border-none shadow-md">
+                <CardHeader className="flex flex-row items-center justify-between pb-6 border-b border-slate-100">
+                    <div className="space-y-1">
+                        <CardTitle className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                            <Building2 className="w-6 h-6 text-blue-600" />
+                            Company Master
+                        </CardTitle>
+                        <p className="text-sm text-slate-500">Manage transport companies and corporate profiles</p>
                     </div>
-                ) : (
-                    <>
-                        <div className="table-container">
-                            <table className="table">
-                                <thead>
-                                    <tr>
-                                        <th>ID</th>
-                                        <th>Company Name</th>
-                                        <th>Place</th>
-                                        <th>GST No</th>
-                                        <th>Contact No</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {paginatedCompanies.map((company, index) => (
-                                        <tr key={company.id}>
-                                            <td>{startIndex + index + 1}</td>
-                                            <td style={{ fontWeight: '500' }}>{company.company_name}</td>
-                                            <td>{company.place}</td>
-                                            <td>
-                                                <span style={{
-                                                    background: '#f3f4f6',
-                                                    padding: '4px 8px',
-                                                    borderRadius: '4px',
-                                                    fontSize: '0.85rem',
-                                                    fontFamily: 'monospace'
-                                                }}>
-                                                    {company.gst_no}
-                                                </span>
-                                            </td>
-                                            <td>{company.contact_no}</td>
-                                            <td>
-                                                <div className="table-actions">
-                                                    <button
-                                                        onClick={() => handleView(company)}
-                                                        className="action-icon view"
-                                                        title="View Details"
-                                                    >
-                                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                                        </svg>
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleEdit(company)}
-                                                        className="action-icon edit"
-                                                        title="Edit Company"
-                                                    >
-                                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                                        </svg>
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDelete(company.id, company.company_name)}
-                                                        className="action-icon delete"
-                                                        title="Delete Company"
-                                                    >
-                                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                        </svg>
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                    <Button
+                        onClick={() => handleOpenModal('add')}
+                        className="bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-200"
+                    >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add New Company
+                    </Button>
+                </CardHeader>
+
+                <CardContent className="pt-6">
+                    {error && (
+                        <div className="mb-4 p-4 bg-red-50 border border-red-100 text-red-600 rounded-lg text-sm font-medium">
+                            {error}
+                        </div>
+                    )}
+                    {successMsg && (
+                        <div className="mb-4 p-4 bg-green-50 border border-green-100 text-green-600 rounded-lg text-sm font-medium">
+                            {successMsg}
+                        </div>
+                    )}
+
+                    {companies.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                            <div className="bg-slate-50 p-6 rounded-full mb-4">
+                                <SearchX className="w-12 h-12 text-slate-300" />
+                            </div>
+                            <h3 className="text-lg font-semibold text-slate-900 mb-1">No Companies Found</h3>
+                            <p className="text-slate-500 mb-6">Register your companies to start managing operations.</p>
+                            <Button variant="outline" onClick={() => handleOpenModal('add')}>
+                                Add New Company
+                            </Button>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="rounded-md border border-slate-100 overflow-hidden">
+                                <Table>
+                                    <TableHeader className="bg-slate-50/50">
+                                        <TableRow>
+                                            <TableHead className="w-[80px] font-bold text-slate-700">S.No</TableHead>
+                                            <TableHead className="font-bold text-slate-700">Company Name</TableHead>
+                                            <TableHead className="font-bold text-slate-700">Place</TableHead>
+                                            <TableHead className="font-bold text-slate-700">GST No</TableHead>
+                                            <TableHead className="font-bold text-slate-700">Contact</TableHead>
+                                            <TableHead className="text-right font-bold text-slate-700">Actions</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {paginatedItems.map((c, i) => (
+                                            <TableRow key={c.id} className="hover:bg-slate-50/50 transition-colors">
+                                                <TableCell className="font-medium text-slate-500 text-xs">
+                                                    {startIndex + i + 1}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="font-semibold text-slate-900">{c.company_name}</div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="flex items-center gap-1.5 text-slate-600 text-sm">
+                                                        <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                                                        {c.place}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Badge variant="secondary" className="font-mono bg-slate-100 text-slate-700 border-none">
+                                                        {c.gst_no}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="flex flex-col">
+                                                        <div className="flex items-center gap-1.5 text-slate-900 text-sm font-medium">
+                                                            <Phone className="w-3 h-3 text-slate-400" />
+                                                            {c.contact_no}
+                                                        </div>
+                                                        <div className="flex items-center gap-1.5 text-slate-500 text-xs mt-0.5">
+                                                            <Mail className="w-3 h-3 text-slate-400" />
+                                                            {c.email_id}
+                                                        </div>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    <div className="flex justify-end gap-1">
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            onClick={() => {
+                                                                setSelectedCompany(c);
+                                                                setViewModalOpen(true);
+                                                            }}
+                                                            className="h-8 w-8 text-slate-500 hover:text-blue-600 hover:bg-blue-50"
+                                                        >
+                                                            <Eye className="h-4 w-4" />
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            onClick={() => handleOpenModal('edit', c)}
+                                                            className="h-8 w-8 text-slate-500 hover:text-amber-600 hover:bg-amber-50"
+                                                        >
+                                                            <Edit className="h-4 w-4" />
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            onClick={() => handleDelete(c.id, c.company_name)}
+                                                            className="h-8 w-8 text-slate-500 hover:text-red-600 hover:bg-red-50"
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+
+                            <div className="mt-4">
+                                <Pagination
+                                    currentPage={currentPage}
+                                    totalItems={companies.length}
+                                    itemsPerPage={itemsPerPage}
+                                    onPageChange={setCurrentPage}
+                                    onItemsPerPageChange={setItemsPerPage}
+                                />
+                            </div>
+                        </>
+                    )}
+                </CardContent>
+            </Card >
+
+            <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+                <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-xl font-bold">
+                            {modalMode === 'add' ? <Plus className="w-5 h-5 text-blue-600" /> : <Edit className="w-5 h-5 text-amber-600" />}
+                            {modalMode === 'add' ? 'Register New Company' : 'Edit Company Profile'}
+                        </DialogTitle>
+                    </DialogHeader>
+
+                    <form onSubmit={handleSubmit} className="space-y-6 py-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="company_name" className="required flex items-center gap-2">
+                                    <Building2 className="w-3 h-3 text-slate-400" /> Company Name
+                                </Label>
+                                <Input
+                                    id="company_name"
+                                    value={formData.company_name}
+                                    onChange={e => setFormData({ ...formData, company_name: e.target.value })}
+                                    placeholder="Enter company name"
+                                    className={cn(formErrors.company_name && "border-red-500")}
+                                    required
+                                />
+                                {formErrors.company_name && <p className="text-xs text-red-500">{formErrors.company_name}</p>}
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="place" className="required flex items-center gap-2">
+                                    <MapPin className="w-3 h-3 text-slate-400" /> City / Place
+                                </Label>
+                                <Input
+                                    id="place"
+                                    value={formData.place}
+                                    onChange={e => setFormData({ ...formData, place: e.target.value })}
+                                    placeholder="e.g. Mumbai"
+                                    className={cn(formErrors.place && "border-red-500")}
+                                    required
+                                />
+                                {formErrors.place && <p className="text-xs text-red-500">{formErrors.place}</p>}
+                            </div>
                         </div>
 
-                        <Pagination
-                            currentPage={currentPage}
-                            totalItems={totalItems}
-                            itemsPerPage={itemsPerPage}
-                            onPageChange={setCurrentPage}
-                            onItemsPerPageChange={(val) => {
-                                setItemsPerPage(val);
-                                setCurrentPage(1);
-                            }}
-                        />
-                    </>
-                )}
-            </div>
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="address1" className="required flex items-center gap-2">
+                                    <FileText className="w-3 h-3 text-slate-400" /> Address Line 1
+                                </Label>
+                                <Textarea
+                                    id="address1"
+                                    value={formData.company_address_1}
+                                    onChange={e => setFormData({ ...formData, company_address_1: e.target.value })}
+                                    className={cn("min-h-[80px]", formErrors.company_address_1 && "border-red-500")}
+                                    required
+                                />
+                                {formErrors.company_address_1 && <p className="text-xs text-red-500">{formErrors.company_address_1}</p>}
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="address2" className="flex items-center gap-2 text-slate-500">
+                                    <FileText className="w-3 h-3 text-slate-300" /> Address Line 2 (Optional)
+                                </Label>
+                                <Textarea
+                                    id="address2"
+                                    value={formData.company_address_2}
+                                    onChange={e => setFormData({ ...formData, company_address_2: e.target.value })}
+                                    className="min-h-[80px]"
+                                />
+                            </div>
+                        </div>
 
-            {/* Modals */}
-            <AddCompanyModal
-                isOpen={addModalOpen}
-                onClose={() => setAddModalOpen(false)}
-                onSuccess={handleSuccess}
-            />
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="gst" className="required flex items-center gap-2">
+                                    <Hash className="w-3 h-3 text-slate-400" /> GST Number
+                                </Label>
+                                <Input
+                                    id="gst"
+                                    value={formData.gst_no}
+                                    onChange={e => setFormData({ ...formData, gst_no: e.target.value })}
+                                    className={cn("font-mono uppercase", formErrors.gst_no && "border-red-500")}
+                                    placeholder="22AAAAA0000A1Z5"
+                                    maxLength={15}
+                                    required
+                                />
+                                {formErrors.gst_no && <p className="text-xs text-red-500">{formErrors.gst_no}</p>}
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="pin" className="required flex items-center gap-2">
+                                    <Globe className="w-3 h-3 text-slate-400" /> PIN Code
+                                </Label>
+                                <Input
+                                    id="pin"
+                                    value={formData.pin_code}
+                                    onChange={e => setFormData({ ...formData, pin_code: e.target.value })}
+                                    maxLength={6}
+                                    className={cn(formErrors.pin_code && "border-red-500")}
+                                    required
+                                />
+                                {formErrors.pin_code && <p className="text-xs text-red-500">{formErrors.pin_code}</p>}
+                            </div>
+                        </div>
 
-            <EditCompanyModal
-                isOpen={editModalOpen}
-                onClose={() => setEditModalOpen(false)}
-                company={selectedCompany}
-                onSuccess={handleSuccess}
-            />
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="contact" className="required flex items-center gap-2">
+                                    <Phone className="w-3 h-3 text-slate-400" /> Contact Number
+                                </Label>
+                                <Input
+                                    id="contact"
+                                    value={formData.contact_no}
+                                    onChange={e => setFormData({ ...formData, contact_no: e.target.value })}
+                                    maxLength={10}
+                                    className={cn(formErrors.contact_no && "border-red-500")}
+                                    required
+                                />
+                                {formErrors.contact_no && <p className="text-xs text-red-500">{formErrors.contact_no}</p>}
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="email" className="required flex items-center gap-2">
+                                    <Mail className="w-3 h-3 text-slate-400" /> Email Address
+                                </Label>
+                                <Input
+                                    id="email"
+                                    type="email"
+                                    value={formData.email_id}
+                                    onChange={e => setFormData({ ...formData, email_id: e.target.value })}
+                                    className={cn(formErrors.email_id && "border-red-500")}
+                                    required
+                                />
+                                {formErrors.email_id && <p className="text-xs text-red-500">{formErrors.email_id}</p>}
+                            </div>
+                        </div>
+
+                        <DialogFooter className="pt-6 border-t border-slate-100">
+                            <Button type="button" variant="outline" onClick={() => setModalOpen(false)} disabled={submitting}>
+                                Cancel
+                            </Button>
+                            <Button
+                                type="submit"
+                                disabled={submitting}
+                                className={cn(
+                                    "min-w-[120px]",
+                                    modalMode === 'edit' ? "bg-amber-600 hover:bg-amber-700 shadow-amber-100" : "bg-blue-600 hover:bg-blue-700 shadow-blue-100"
+                                )}
+                            >
+                                {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                                {modalMode === 'add' ? 'Register Company' : 'Update Profile'}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
 
             <ViewCompanyModal
                 isOpen={viewModalOpen}
                 onClose={() => setViewModalOpen(false)}
                 company={selectedCompany}
             />
-        </div>
+        </div >
     );
 };
 

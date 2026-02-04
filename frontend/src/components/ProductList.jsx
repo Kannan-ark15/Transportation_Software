@@ -1,7 +1,45 @@
 import React, { useState, useEffect } from 'react';
 import { productAPI } from '../services/api';
 import Pagination from './Pagination';
-import Modal from './Modal';
+import {
+    Plus,
+    Search,
+    Eye,
+    Edit,
+    Trash2,
+    Package,
+    SearchX,
+    Loader2,
+    Scale
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow
+} from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+} from "@/components/ui/dialog";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { cn } from '@/lib/utils';
 
 const ProductList = () => {
     const [products, setProducts] = useState([]);
@@ -18,6 +56,7 @@ const ProductList = () => {
     const [modalMode, setModalMode] = useState('add'); // 'add', 'edit', 'view'
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [formData, setFormData] = useState({ product_name: '', measuring_unit: 'Tons' });
+    const [submitting, setSubmitting] = useState(false);
 
     useEffect(() => {
         loadProducts();
@@ -49,6 +88,7 @@ const ProductList = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
+            setSubmitting(true);
             let res;
             if (modalMode === 'add') {
                 res = await productAPI.create(formData);
@@ -64,122 +104,226 @@ const ProductList = () => {
             }
         } catch (err) {
             setError(err.response?.data?.message || 'Operation failed');
+        } finally {
+            setSubmitting(false);
         }
     };
 
     const handleDelete = async (id, name) => {
-        if (!window.confirm(`Delete ${name}?`)) return;
+        if (!window.confirm(`Are you sure you want to delete "${name}"?`)) return;
         try {
             const res = await productAPI.delete(id);
             if (res.success) {
-                setSuccessMsg('Product deleted');
+                setSuccessMsg('Product deleted successfully');
                 loadProducts();
                 setTimeout(() => setSuccessMsg(''), 3000);
             }
         } catch (err) {
-            setError('Failed to delete');
+            setError('Failed to delete product');
         }
     };
 
     const startIndex = (currentPage - 1) * itemsPerPage;
     const paginatedItems = products.slice(startIndex, startIndex + itemsPerPage);
 
-    if (loading) return <div className="content-wrapper">Loading...</div>;
+    if (loading) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[400px] text-slate-500">
+                <Loader2 className="h-12 w-12 animate-spin text-blue-600 mb-4" />
+                <p className="text-lg font-medium">Loading products...</p>
+            </div>
+        );
+    }
 
     return (
-        <div className="content-wrapper">
-            <div className="card">
-                <div className="card-header">
-                    <h2 className="card-title">Product Master</h2>
-                    <button className="btn btn-primary" onClick={() => handleOpenModal('add')}>
+        <div className="space-y-6">
+            <Card className="border-none shadow-md">
+                <CardHeader className="flex flex-row items-center justify-between pb-6 border-b border-slate-100">
+                    <div className="space-y-1">
+                        <CardTitle className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                            <Package className="w-6 h-6 text-blue-600" />
+                            Product Master
+                        </CardTitle>
+                        <p className="text-sm text-slate-500">Manage your transport goods and materials</p>
+                    </div>
+                    <Button
+                        onClick={() => handleOpenModal('add')}
+                        className="bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-200"
+                    >
+                        <Plus className="w-4 h-4 mr-2" />
                         Add New Product
-                    </button>
-                </div>
+                    </Button>
+                </CardHeader>
 
-                {error && <div className="error-message">{error}</div>}
-                {successMsg && <div className="success-message">{successMsg}</div>}
-
-                <div className="table-container">
-                    <table className="table">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>Product Name</th>
-                                <th>Measuring Unit</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {paginatedItems.map((p, i) => (
-                                <tr key={p.id}>
-                                    <td>{startIndex + i + 1}</td>
-                                    <td>{p.product_name}</td>
-                                    <td>{p.measuring_unit}</td>
-                                    <td>
-                                        <div className="table-actions">
-                                            <button className="action-icon view" onClick={() => handleOpenModal('view', p)}>
-                                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                                            </button>
-                                            <button className="action-icon edit" onClick={() => handleOpenModal('edit', p)}>
-                                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                                            </button>
-                                            <button className="action-icon delete" onClick={() => handleDelete(p.id, p.product_name)}>
-                                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-
-                <Pagination
-                    currentPage={currentPage}
-                    totalItems={products.length}
-                    itemsPerPage={itemsPerPage}
-                    onPageChange={setCurrentPage}
-                    onItemsPerPageChange={setItemsPerPage}
-                />
-            </div>
-
-            <Modal
-                isOpen={modalOpen}
-                onClose={() => setModalOpen(false)}
-                title={modalMode === 'add' ? 'Add Product' : modalMode === 'edit' ? 'Edit Product' : 'Product Details'}
-            >
-                <form onSubmit={handleSubmit}>
-                    <div className="form-group">
-                        <label className="form-label required">Product Name</label>
-                        <input
-                            type="text"
-                            className="form-control"
-                            value={formData.product_name}
-                            disabled={modalMode === 'view'}
-                            onChange={e => setFormData({ ...formData, product_name: e.target.value })}
-                            required
-                        />
-                    </div>
-                    <div className="form-group">
-                        <label className="form-label required">Measuring Unit</label>
-                        <select
-                            className="form-control"
-                            value={formData.measuring_unit}
-                            disabled={modalMode === 'view'}
-                            onChange={e => setFormData({ ...formData, measuring_unit: e.target.value })}
-                        >
-                            <option value="Tons">Tons</option>
-                            <option value="Nos">Nos</option>
-                        </select>
-                    </div>
-                    {modalMode !== 'view' && (
-                        <div className="modal-footer">
-                            <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>
-                            <button type="submit" className="btn btn-primary">{modalMode === 'add' ? 'Save' : 'Update'}</button>
+                <CardContent className="pt-6">
+                    {error && (
+                        <div className="mb-4 p-4 bg-red-50 border border-red-100 text-red-600 rounded-lg text-sm font-medium">
+                            {error}
                         </div>
                     )}
-                </form>
-            </Modal>
+                    {successMsg && (
+                        <div className="mb-4 p-4 bg-green-50 border border-green-100 text-green-600 rounded-lg text-sm font-medium">
+                            {successMsg}
+                        </div>
+                    )}
+
+                    {products.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                            <div className="bg-slate-50 p-6 rounded-full mb-4">
+                                <SearchX className="w-12 h-12 text-slate-300" />
+                            </div>
+                            <h3 className="text-lg font-semibold text-slate-900 mb-1">No Products Found</h3>
+                            <p className="text-slate-500 mb-6">Start by adding your first product to the delivery system.</p>
+                            <Button variant="outline" onClick={() => handleOpenModal('add')}>
+                                Add New Product
+                            </Button>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="rounded-md border border-slate-100 overflow-hidden">
+                                <Table>
+                                    <TableHeader className="bg-slate-50/50">
+                                        <TableRow>
+                                            <TableHead className="w-[80px] font-bold text-slate-700">S.No</TableHead>
+                                            <TableHead className="font-bold text-slate-700">Product Name</TableHead>
+                                            <TableHead className="font-bold text-slate-700">Measuring Unit</TableHead>
+                                            <TableHead className="text-right font-bold text-slate-700">Actions</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {paginatedItems.map((p, i) => (
+                                            <TableRow key={p.id} className="hover:bg-slate-50/50 transition-colors">
+                                                <TableCell className="font-medium text-slate-500">
+                                                    {startIndex + i + 1}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="font-semibold text-slate-900">{p.product_name}</div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Badge variant="secondary" className="bg-slate-100 text-slate-700 border-none font-medium">
+                                                        {p.measuring_unit}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    <div className="flex justify-end gap-1">
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            onClick={() => handleOpenModal('view', p)}
+                                                            className="h-8 w-8 text-slate-500 hover:text-blue-600 hover:bg-blue-50"
+                                                        >
+                                                            <Eye className="h-4 w-4" />
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            onClick={() => handleOpenModal('edit', p)}
+                                                            className="h-8 w-8 text-slate-500 hover:text-amber-600 hover:bg-amber-50"
+                                                        >
+                                                            <Edit className="h-4 w-4" />
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            onClick={() => handleDelete(p.id, p.product_name)}
+                                                            className="h-8 w-8 text-slate-500 hover:text-red-600 hover:bg-red-50"
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+
+                            <div className="mt-4">
+                                <Pagination
+                                    currentPage={currentPage}
+                                    totalItems={products.length}
+                                    itemsPerPage={itemsPerPage}
+                                    onPageChange={setCurrentPage}
+                                    onItemsPerPageChange={setItemsPerPage}
+                                />
+                            </div>
+                        </>
+                    )}
+                </CardContent>
+            </Card>
+
+            <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            {modalMode === 'add' ? <Plus className="w-5 h-5 text-blue-600" /> : modalMode === 'edit' ? <Edit className="w-5 h-5 text-amber-600" /> : <Eye className="w-5 h-5 text-blue-600" />}
+                            {modalMode === 'add' ? 'Add New Product' : modalMode === 'edit' ? 'Edit Product' : 'Product Details'}
+                        </DialogTitle>
+                    </DialogHeader>
+
+                    <form onSubmit={handleSubmit} className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="product_name" className="required">Product Name</Label>
+                            <Input
+                                id="product_name"
+                                value={formData.product_name}
+                                disabled={modalMode === 'view'}
+                                onChange={e => setFormData({ ...formData, product_name: e.target.value })}
+                                placeholder="Enter product name"
+                                required
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="measuring_unit" className="required text-slate-700">Measuring Unit</Label>
+                            <Select
+                                value={formData.measuring_unit}
+                                onValueChange={val => setFormData({ ...formData, measuring_unit: val })}
+                                disabled={modalMode === 'view'}
+                            >
+                                <SelectTrigger className="w-full">
+                                    <SelectValue placeholder="Select unit" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Tons">
+                                        <div className="flex items-center gap-2">
+                                            <Scale className="w-4 h-4 text-slate-400" />
+                                            Tons
+                                        </div>
+                                    </SelectItem>
+                                    <SelectItem value="Nos">
+                                        <div className="flex items-center gap-2">
+                                            <Package className="w-4 h-4 text-slate-400" />
+                                            Nos (Number)
+                                        </div>
+                                    </SelectItem>
+                                    <SelectItem value="Liters">Liters</SelectItem>
+                                    <SelectItem value="Kilograms">Kilograms</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {modalMode !== 'view' && (
+                            <DialogFooter className="pt-4">
+                                <Button type="button" variant="outline" onClick={() => setModalOpen(false)} disabled={submitting}>
+                                    Cancel
+                                </Button>
+                                <Button type="submit" disabled={submitting} className={cn(modalMode === 'edit' ? "bg-amber-600 hover:bg-amber-700" : "bg-blue-600 hover:bg-blue-700")}>
+                                    {submitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                                    {modalMode === 'add' ? 'Save Product' : 'Update Changes'}
+                                </Button>
+                            </DialogFooter>
+                        )}
+                        {modalMode === 'view' && (
+                            <DialogFooter className="pt-4">
+                                <Button type="button" onClick={() => setModalOpen(false)}>
+                                    Close
+                                </Button>
+                            </DialogFooter>
+                        )}
+                    </form>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 };
