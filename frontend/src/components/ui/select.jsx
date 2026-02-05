@@ -3,6 +3,7 @@ import * as SelectPrimitive from "@radix-ui/react-select"
 import { Check, ChevronDown, ChevronUp } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { Input } from "@/components/ui/input"
 
 const Select = SelectPrimitive.Root
 
@@ -50,35 +51,6 @@ const SelectScrollDownButton = React.forwardRef(({ className, ...props }, ref) =
 SelectScrollDownButton.displayName =
     SelectPrimitive.ScrollDownButton.displayName
 
-const SelectContent = React.forwardRef(({ className, children, position = "popper", ...props }, ref) => (
-    <SelectPrimitive.Portal>
-        <SelectPrimitive.Content
-            ref={ref}
-            className={cn(
-                "relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
-                position === "popper" &&
-                "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
-                className
-            )}
-            position={position}
-            {...props}
-        >
-            <SelectScrollUpButton />
-            <SelectPrimitive.Viewport
-                className={cn(
-                    "p-1",
-                    position === "popper" &&
-                    "h-[var(--radix-select-content-available-height)] w-full min-w-[var(--radix-select-trigger-width)]"
-                )}
-            >
-                {children}
-            </SelectPrimitive.Viewport>
-            <SelectScrollDownButton />
-        </SelectPrimitive.Content>
-    </SelectPrimitive.Portal>
-))
-SelectContent.displayName = SelectPrimitive.Content.displayName
-
 const SelectLabel = React.forwardRef(({ className, ...props }, ref) => (
     <SelectPrimitive.Label
         ref={ref}
@@ -116,6 +88,114 @@ const SelectSeparator = React.forwardRef(({ className, ...props }, ref) => (
     />
 ))
 SelectSeparator.displayName = SelectPrimitive.Separator.displayName
+
+const getNodeText = (node) => {
+    if (node === null || node === undefined) return ""
+    if (typeof node === "string" || typeof node === "number") return String(node)
+    if (Array.isArray(node)) return node.map(getNodeText).join(" ")
+    if (React.isValidElement(node)) return getNodeText(node.props.children)
+    return ""
+}
+
+const filterSelectChildren = (children, query) => {
+    const q = query.trim().toLowerCase()
+    const nodes = React.Children.toArray(children)
+    if (!q) return nodes
+
+    const filtered = []
+    nodes.forEach((node) => {
+        if (!React.isValidElement(node)) return
+
+        if (node.type === SelectGroup) {
+            const groupChildren = filterSelectChildren(node.props.children, q)
+            if (groupChildren.length > 0) {
+                filtered.push(React.cloneElement(node, { children: groupChildren }))
+            }
+            return
+        }
+
+        if (node.type === SelectSeparator || node.type === SelectLabel) {
+            return
+        }
+
+        if (node.type === SelectItem) {
+            const text = getNodeText(node.props.children).toLowerCase()
+            if (text.includes(q)) {
+                filtered.push(node)
+            }
+            return
+        }
+
+        filtered.push(node)
+    })
+
+    return filtered
+}
+
+const SelectContent = React.forwardRef(
+    (
+        {
+            className,
+            children,
+            position = "popper",
+            searchable = true,
+            searchPlaceholder = "Type to filter...",
+            ...props
+        },
+        ref
+    ) => {
+        const [searchValue, setSearchValue] = React.useState("")
+        const filteredChildren = React.useMemo(
+            () => (searchable ? filterSelectChildren(children, searchValue) : React.Children.toArray(children)),
+            [children, searchValue, searchable]
+        )
+
+        return (
+            <SelectPrimitive.Portal>
+                <SelectPrimitive.Content
+                    ref={ref}
+                    className={cn(
+                        "relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
+                        position === "popper" &&
+                            "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
+                        className
+                    )}
+                    position={position}
+                    {...props}
+                >
+                    {searchable && (
+                        <div className="p-2 border-b border-border/60 bg-white/70">
+                            <Input
+                                value={searchValue}
+                                onChange={(event) => setSearchValue(event.target.value)}
+                                placeholder={searchPlaceholder}
+                                className="h-9 rounded-full bg-white/80 border-border/60 text-sm shadow-soft-inset"
+                                onKeyDown={(event) => event.stopPropagation()}
+                                autoFocus
+                            />
+                        </div>
+                    )}
+                    <SelectScrollUpButton />
+                    <SelectPrimitive.Viewport
+                        className={cn(
+                            "p-1",
+                            position === "popper" &&
+                                "h-[var(--radix-select-content-available-height)] w-full min-w-[var(--radix-select-trigger-width)]"
+                        )}
+                    >
+                        {filteredChildren.length > 0 ? (
+                            filteredChildren
+                        ) : (
+                            <div className="px-3 py-2 text-sm text-muted-foreground">No results found</div>
+                        )}
+                    </SelectPrimitive.Viewport>
+                    <SelectScrollDownButton />
+                </SelectPrimitive.Content>
+            </SelectPrimitive.Portal>
+        )
+    }
+)
+SelectContent.displayName = SelectPrimitive.Content.displayName
 
 export {
     Select,

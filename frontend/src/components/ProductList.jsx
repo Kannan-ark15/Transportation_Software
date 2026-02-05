@@ -58,6 +58,7 @@ const ProductList = () => {
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [formData, setFormData] = useState({ product_name: '', measuring_unit: 'Tons' });
     const [submitting, setSubmitting] = useState(false);
+    const allowedUnits = ['Tons', 'Nos'];
 
     useEffect(() => {
         loadProducts();
@@ -67,7 +68,10 @@ const ProductList = () => {
         try {
             setLoading(true);
             const res = await productAPI.getAll();
-            if (res.success) setProducts(res.data);
+            if (res.success) setProducts(res.data.map(p => ({
+                ...p,
+                measuring_unit: allowedUnits.includes(p.measuring_unit) ? p.measuring_unit : 'Tons'
+            })));
         } catch (err) {
             setError('Failed to load products');
         } finally {
@@ -82,9 +86,10 @@ const ProductList = () => {
             let errors = [];
 
             for (const row of importedData) {
+                const rawUnit = row['Measuring Unit'] || row['measuring_unit'] || 'Tons';
                 const mappedData = {
                     product_name: row['Product Name'] || row['product_name'],
-                    measuring_unit: row['Measuring Unit'] || row['measuring_unit'] || 'Tons'
+                    measuring_unit: allowedUnits.includes(rawUnit) ? rawUnit : 'Tons'
                 };
 
                 if (!mappedData.product_name) continue;
@@ -116,7 +121,8 @@ const ProductList = () => {
         setModalMode(mode);
         setSelectedProduct(product);
         if (product) {
-            setFormData({ product_name: product.product_name, measuring_unit: product.measuring_unit });
+            const mu = allowedUnits.includes(product.measuring_unit) ? product.measuring_unit : 'Tons';
+            setFormData({ product_name: product.product_name, measuring_unit: mu });
         } else {
             setFormData({ product_name: '', measuring_unit: 'Tons' });
         }
@@ -344,8 +350,6 @@ const ProductList = () => {
                                             Nos (Number)
                                         </div>
                                     </SelectItem>
-                                    <SelectItem value="Liters">Liters</SelectItem>
-                                    <SelectItem value="Kilograms">Kilograms</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
