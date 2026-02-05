@@ -37,37 +37,45 @@
 }
 
 :root {
-  --background: 0 0% 100%;
-  --foreground: 222.2 84% 4.9%;
-  --card: 0 0% 100%;
-  --card-foreground: 222.2 84% 4.9%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 222.2 84% 4.9%;
-  --primary: 221.2 83.2% 53.3%;
-  --primary-foreground: 210 40% 98%;
-  --secondary: 210 40% 96.1%;
-  --secondary-foreground: 222.2 47.4% 11.2%;
-  --muted: 210 40% 96.1%;
-  --muted-foreground: 215.4 16.3% 46.9%;
-  --accent: 210 40% 96.1%;
-  --accent-foreground: 222.2 47.4% 11.2%;
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 210 40% 98%;
-  --border: 214.3 31.8% 91.4%;
-  --input: 214.3 31.8% 91.4%;
-  --ring: 221.2 83.2% 53.3%;
-  --radius: 0.5rem;
+  --background: 210 20% 96%;
+  --foreground: 220 13% 21%;
+  --card: 210 20% 98%;
+  --card-foreground: 220 13% 21%;
+  --popover: 210 20% 98%;
+  --popover-foreground: 220 13% 21%;
+  --primary: 220 13% 21%;
+  --primary-foreground: 210 20% 98%;
+  --secondary: 215 20% 95%;
+  --secondary-foreground: 220 13% 21%;
+  --muted: 215 20% 95%;
+  --muted-foreground: 215 10% 52%;
+  --accent: 152 35% 52%;
+  --accent-foreground: 210 20% 98%;
+  --destructive: 0 70% 55%;
+  --destructive-foreground: 210 20% 98%;
+  --border: 215 17% 90%;
+  --input: 215 17% 90%;
+  --ring: 212 20% 83%;
+  --radius: 1rem;
+  --sidebar: 220 13% 21%;
+  --sidebar-foreground: 210 20% 98%;
+  --sidebar-border: 220 13% 28%;
+  --sidebar-accent: 220 13% 26%;
+  --sidebar-accent-foreground: 210 20% 98%;
+  --sidebar-ring: 212 20% 60%;
 
-  --primary-color: #3b82f6;
-  --primary-hover: #2563eb;
-  --bg-gray: #f1f5f9;
-  --border-color: #e2e8f0;
-  --text-primary: #1e293b;
-  --text-secondary: #64748b;
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  --sidebar-bg: #0f172a;
-  --sidebar-hover: #1e293b;
+  --primary-color: #2f343d;
+  --primary-hover: #262b32;
+  --bg-gray: #f3f5f8;
+  --border-color: #e1e5ea;
+  --text-primary: #2f343d;
+  --text-secondary: #7a8491;
+  --shadow-sm: 0 2px 8px rgba(23, 28, 38, 0.06);
+  --shadow: 0 8px 24px rgba(23, 28, 38, 0.08);
+  --shadow-soft: 0 8px 24px rgba(23, 28, 38, 0.08);
+  --shadow-soft-inset: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  --sidebar-bg: #2f343d;
+  --sidebar-hover: #3b424e;
 }
 
 .dark {
@@ -81,8 +89,10 @@
 
 body {
   font-family: var(--font-sans);
-  background-color: hsl(var(--background));
+  background: linear-gradient(180deg, #eef1f5 0%, #f6f7fa 100%);
+  background-attachment: fixed;
   color: hsl(var(--foreground));
+  min-height: 100vh;
 }
 
 /* Layout */

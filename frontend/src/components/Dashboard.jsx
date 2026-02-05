@@ -21,44 +21,53 @@ const Dashboard = () => {
             label: 'Active Vehicles',
             value: '510',
             icon: <Truck className="w-6 h-6" />,
-            color: "text-blue-600",
-            bg: "bg-blue-100",
+            iconColor: "text-foreground",
+            iconBg: "bg-muted",
             trend: "+12.5% from last month",
-            trendColor: "text-green-600"
+            trendColor: "text-accent"
         },
         {
             label: 'Daily Transactions',
             value: '520',
             icon: <ClipboardList className="w-6 h-6" />,
-            color: "text-purple-600",
-            bg: "bg-purple-100",
+            iconColor: "text-background",
+            iconBg: "bg-background/10",
             trend: "+4.2% from last week",
-            trendColor: "text-green-600"
+            trendColor: "text-accent",
+            variant: "dark"
         },
         {
             label: 'Fuel Efficiency',
             value: '94%',
             icon: <Zap className="w-6 h-6" />,
-            color: "text-amber-600",
-            bg: "bg-amber-100",
+            iconColor: "text-accent",
+            iconBg: "bg-accent/15",
             trend: "-0.8% from yesterday",
-            trendColor: "text-red-600"
+            trendColor: "text-destructive"
         }
     ];
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
             <div>
-                <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Dashboard Overview</h1>
-                <p className="text-slate-500 mt-2">Welcome back! Here's what's happening with your transport fleet today.</p>
+                <h1 className="text-3xl font-bold text-foreground tracking-tight">Dashboard Overview</h1>
+                <p className="text-muted-foreground mt-2">Welcome back! Here's what's happening with your transport fleet today.</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {stats.map((stat, index) => (
-                    <Card key={index} className="border-none shadow-sm hover:shadow-md transition-shadow duration-200">
+                {stats.map((stat, index) => {
+                    const isDark = stat.variant === "dark";
+                    return (
+                        <Card
+                            key={index}
+                            className={cn(
+                                "border-none shadow-soft transition-all duration-200 hover:shadow-soft-lg",
+                                isDark ? "bg-foreground text-background" : "bg-card"
+                            )}
+                        >
                         <CardContent className="p-6">
                             <div className="flex items-center justify-between">
-                                <div className={cn("p-3 rounded-xl", stat.bg, stat.color)}>
+                                <div className={cn("p-3 rounded-2xl", stat.iconBg, stat.iconColor)}>
                                     {stat.icon}
                                 </div>
                                 <div className={cn("flex items-center gap-1 text-xs font-medium", stat.trendColor)}>
@@ -67,15 +76,20 @@ const Dashboard = () => {
                                 </div>
                             </div>
                             <div className="mt-4">
-                                <h3 className="text-slate-500 text-sm font-medium">{stat.label}</h3>
-                                <div className="text-3xl font-bold text-slate-900 mt-1">{stat.value}</div>
+                                <h3 className={cn("text-sm font-medium", isDark ? "text-background/70" : "text-muted-foreground")}>
+                                    {stat.label}
+                                </h3>
+                                <div className={cn("text-3xl font-bold mt-1", isDark ? "text-background" : "text-foreground")}>
+                                    {stat.value}
+                                </div>
                             </div>
                         </CardContent>
                     </Card>
-                ))}
+                    );
+                })}
             </div>
 
-            <Card className="border-none shadow-sm">
+            <Card className="border-none shadow-soft">
                 <CardHeader>
                     <CardTitle className="text-xl font-bold">Quick Actions</CardTitle>
                 </CardHeader>
@@ -83,33 +97,33 @@ const Dashboard = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <Button
                             variant="outline"
-                            className="h-32 flex flex-col gap-3 group border-slate-200 hover:border-blue-500 hover:bg-blue-50 transition-all"
+                            className="h-32 rounded-2xl flex flex-col gap-3 group border-border/60 bg-white/60 hover:bg-muted/70 transition-all shadow-soft"
                             onClick={() => navigate('/masters/company')}
                         >
-                            <div className="p-3 bg-slate-100 rounded-full group-hover:bg-blue-100 transition-colors">
-                                <Building2 className="w-6 h-6 text-slate-600 group-hover:text-blue-600" />
+                            <div className="p-3 bg-muted/70 rounded-2xl group-hover:bg-white transition-colors shadow-soft-inset">
+                                <Building2 className="w-6 h-6 text-muted-foreground group-hover:text-foreground" />
                             </div>
-                            <span className="font-semibold text-slate-700 group-hover:text-blue-700">Company Master</span>
+                            <span className="font-semibold text-foreground/80 group-hover:text-foreground">Company Master</span>
                         </Button>
 
                         <Button
                             variant="outline"
-                            className="h-32 flex flex-col gap-3 group border-slate-200 hover:border-purple-500 hover:bg-purple-50 transition-all"
+                            className="h-32 rounded-2xl flex flex-col gap-3 group border-border/60 bg-white/60 hover:bg-muted/70 transition-all shadow-soft"
                         >
-                            <div className="p-3 bg-slate-100 rounded-full group-hover:bg-purple-100 transition-colors">
-                                <ClipboardList className="w-6 h-6 text-slate-600 group-hover:text-purple-600" />
+                            <div className="p-3 bg-muted/70 rounded-2xl group-hover:bg-white transition-colors shadow-soft-inset">
+                                <ClipboardList className="w-6 h-6 text-muted-foreground group-hover:text-foreground" />
                             </div>
-                            <span className="font-semibold text-slate-700 group-hover:text-purple-700">New Transaction</span>
+                            <span className="font-semibold text-foreground/80 group-hover:text-foreground">New Transaction</span>
                         </Button>
 
                         <Button
                             variant="outline"
-                            className="h-32 flex flex-col gap-3 group border-slate-200 hover:border-amber-500 hover:bg-amber-50 transition-all"
+                            className="h-32 rounded-2xl flex flex-col gap-3 group border-border/60 bg-white/60 hover:bg-muted/70 transition-all shadow-soft"
                         >
-                            <div className="p-3 bg-slate-100 rounded-full group-hover:bg-amber-100 transition-colors">
-                                <BarChart3 className="w-6 h-6 text-slate-600 group-hover:text-amber-600" />
+                            <div className="p-3 bg-muted/70 rounded-2xl group-hover:bg-white transition-colors shadow-soft-inset">
+                                <BarChart3 className="w-6 h-6 text-muted-foreground group-hover:text-foreground" />
                             </div>
-                            <span className="font-semibold text-slate-700 group-hover:text-amber-700">View Reports</span>
+                            <span className="font-semibold text-foreground/80 group-hover:text-foreground">View Reports</span>
                         </Button>
                     </div>
                 </CardContent>

@@ -96,10 +96,13 @@ const Sidebar = () => {
     };
 
     return (
-        <ShadcnSidebar collapsible="icon" className="border-r border-slate-800 bg-slate-900 text-slate-300">
-            <SidebarHeader className="p-6 border-b border-slate-800">
+        <ShadcnSidebar
+            collapsible="icon"
+            className="border border-white/10 bg-[#2f343d] text-white shadow-soft rounded-3xl m-6 overflow-hidden"
+        >
+            <SidebarHeader className="p-6 border-b border-white/10">
                 <div className="flex items-center gap-3">
-                    <Truck className="w-8 h-8 text-blue-500" />
+                    <Truck className="w-8 h-8 text-accent" />
                     <span className="text-xl font-bold text-white tracking-tight group-data-[collapsible=icon]:hidden">
                         Transport
                     </span>
@@ -108,7 +111,7 @@ const Sidebar = () => {
 
             <SidebarContent className="py-6">
                 <SidebarGroup>
-                    <SidebarGroupLabel className="text-slate-400 px-4 group-data-[collapsible=icon]:hidden">
+                    <SidebarGroupLabel className="text-white/60 px-4 group-data-[collapsible=icon]:hidden">
                         Main Menu
                     </SidebarGroupLabel>
                     <SidebarGroupContent>
@@ -121,42 +124,44 @@ const Sidebar = () => {
                                             className="group/collapsible w-full"
                                         >
                                             <CollapsibleTrigger asChild>
-                                                <SidebarMenuButton
-                                                    tooltip={item.label}
-                                                    className={cn(
-                                                        "w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-sm font-medium",
-                                                        isSubmenuActive(item.submenu) ? "text-white bg-slate-800" : "text-slate-400 hover:bg-slate-800 hover:text-white"
-                                                    )}
-                                                >
-                                                    {item.icon}
-                                                    <span>{item.label}</span>
-                                                    <ChevronRight className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                                                </SidebarMenuButton>
-                                            </CollapsibleTrigger>
-                                            <CollapsibleContent>
-                                                <SidebarMenuSub className="border-l border-slate-800 ml-6 mt-1">
-                                                    {item.submenu.map((subItem) => (
-                                                        <SidebarMenuSubItem key={subItem.path}>
-                                                            <SidebarMenuSubButton
-                                                                asChild
-                                                                isActive={isActive(subItem.path)}
+                                            <SidebarMenuButton
+                                                tooltip={item.label}
+                                                className={cn(
+                                                    "w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-200 text-sm font-medium",
+                                                    isSubmenuActive(item.submenu)
+                                                        ? "text-white bg-white/10 shadow-soft-inset"
+                                                        : "text-white/70 hover:bg-white/10 hover:text-white"
+                                                )}
+                                            >
+                                                {item.icon}
+                                                <span>{item.label}</span>
+                                                <ChevronRight className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                                            </SidebarMenuButton>
+                                        </CollapsibleTrigger>
+                                        <CollapsibleContent>
+                                            <SidebarMenuSub className="border-l border-white/10 ml-6 mt-1">
+                                                {item.submenu.map((subItem) => (
+                                                    <SidebarMenuSubItem key={subItem.path}>
+                                                        <SidebarMenuSubButton
+                                                            asChild
+                                                            isActive={isActive(subItem.path)}
+                                                        >
+                                                            <a
+                                                                href={subItem.path}
+                                                                onClick={(e) => {
+                                                                    e.preventDefault();
+                                                                    navigate(subItem.path);
+                                                                }}
+                                                                className={cn(
+                                                                    "w-full text-sm py-2 px-3 rounded-lg transition-colors",
+                                                                    isActive(subItem.path)
+                                                                        ? "text-accent font-semibold bg-accent/15"
+                                                                        : "text-white/60 hover:text-white hover:bg-white/10"
+                                                                )}
                                                             >
-                                                                <a
-                                                                    href={subItem.path}
-                                                                    onClick={(e) => {
-                                                                        e.preventDefault();
-                                                                        navigate(subItem.path);
-                                                                    }}
-                                                                    className={cn(
-                                                                        "w-full text-sm py-2 px-3 rounded-md transition-colors",
-                                                                        isActive(subItem.path)
-                                                                            ? "text-blue-400 font-semibold bg-blue-400/10"
-                                                                            : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-                                                                    )}
-                                                                >
-                                                                    {subItem.label}
-                                                                </a>
-                                                            </SidebarMenuSubButton>
+                                                                {subItem.label}
+                                                            </a>
+                                                        </SidebarMenuSubButton>
                                                         </SidebarMenuSubItem>
                                                     ))}
                                                 </SidebarMenuSub>
@@ -168,10 +173,10 @@ const Sidebar = () => {
                                             isActive={isActive(item.path)}
                                             tooltip={item.label}
                                             className={cn(
-                                                "w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-sm font-medium",
+                                                "w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-200 text-sm font-medium",
                                                 isActive(item.path)
-                                                    ? "bg-blue-600 text-white shadow-lg shadow-blue-900/20"
-                                                    : "text-slate-400 hover:bg-slate-800 hover:text-white"
+                                                    ? "bg-white/10 text-white shadow-soft"
+                                                    : "text-white/70 hover:bg-white/10 hover:text-white"
                                             )}
                                         >
                                             <a
@@ -193,14 +198,14 @@ const Sidebar = () => {
                 </SidebarGroup>
             </SidebarContent>
 
-            <SidebarFooter className="p-4 border-t border-slate-800">
+            <SidebarFooter className="p-4 border-t border-white/10">
                 <div className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
-                    <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-semibold">
+                    <div className="w-8 h-8 rounded-full bg-white text-[#2f343d] flex items-center justify-center text-sm font-semibold shadow-soft-inset">
                         A
                     </div>
                     <div className="text-left group-data-[collapsible=icon]:hidden">
                         <p className="text-sm font-medium text-white leading-none">Admin User</p>
-                        <p className="text-xs text-slate-500 mt-1">Administrator</p>
+                        <p className="text-xs text-white/60 mt-1">Administrator</p>
                     </div>
                 </div>
             </SidebarFooter>
