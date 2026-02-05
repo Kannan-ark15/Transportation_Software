@@ -44,4 +44,15 @@ export const ownerAPI = generateCRUD('/owners');
 export const bankAPI = generateCRUD('/banks');
 export const rateCardAPI = generateCRUD('/rate-cards');
 
+export const templatesAPI = {
+    list: async () => {
+        const response = await api.get('/templates');
+        return response.data;
+    },
+    getColumns: async (master) => {
+        const response = await api.get(`/templates/${master}/columns`);
+        return response.data;
+    },
+};
+
 export default api;

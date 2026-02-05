@@ -71,7 +71,7 @@ const Sidebar = () => {
             id: 'templates',
             label: 'Templates',
             icon: <FileText className="w-5 h-5" />,
-            path: '#'
+            path: '/templates'
         },
         {
             id: 'reports',

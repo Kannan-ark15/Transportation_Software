@@ -54,6 +54,19 @@ export const exportToExcel = (data, fileName) => {
 };
 
 /**
+ * Export an Excel template with only headers (no data rows).
+ * @param {Array<string>} headers - Header labels for the first row.
+ * @param {string} fileName - Name of the output file (without extension).
+ * @param {string} sheetName - Excel sheet name.
+ */
+export const exportHeadersTemplateToExcel = (headers, fileName, sheetName = 'Template') => {
+    const worksheet = XLSX.utils.aoa_to_sheet([headers]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+    XLSX.writeFile(workbook, `${fileName}.xlsx`);
+};
+
+/**
  * Export data to a PDF file with a table.
  * @param {string} title - Title of the PDF document.
  * @param {Array} columns - Array of objects { header: 'Name', dataKey: 'name' }

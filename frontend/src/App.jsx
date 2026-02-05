@@ -12,6 +12,7 @@ import VehicleList from './components/VehicleList';
 import OwnerList from './components/OwnerList';
 import BankList from './components/BankList';
 import RateCardList from './components/RateCardList';
+import TemplatesPage from './components/TemplatesPage';
 
 function App() {
     return (
@@ -30,6 +31,7 @@ function App() {
                         <Route path="/masters/owners" element={<OwnerList />} />
                         <Route path="/masters/banks" element={<BankList />} />
                         <Route path="/masters/rate-cards" element={<RateCardList />} />
+                        <Route path="/templates" element={<TemplatesPage />} />
                         <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
                 </Layout>
