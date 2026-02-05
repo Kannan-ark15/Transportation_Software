@@ -4,7 +4,7 @@
     "description": "Transport System Management - Backend API",
     "main": "server.js",
     "scripts": {
-        "start": "set PORT=5001 && node server.js",
+        "start": "node server.js",
         "dev": "set PORT=5001 && nodemon server.js",
         "test": "echo \"Error: no test specified\" && exit 1"
     },
