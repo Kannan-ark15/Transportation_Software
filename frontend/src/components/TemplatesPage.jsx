@@ -75,34 +75,34 @@ const TemplatesPage = () => {
         <div className="space-y-6">
             <div className="flex items-start justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900">Templates</h1>
-                    <p className="text-sm text-slate-600 mt-1">
+                    <h1 className="text-2xl font-bold text-foreground">Templates</h1>
+                    <p className="text-sm text-muted-foreground mt-1">
                         Download Excel templates with prefilled headers for each master.
                     </p>
                 </div>
-                <div className="hidden sm:flex items-center gap-2 text-slate-500">
+                <div className="hidden sm:flex items-center gap-2 text-muted-foreground">
                     <FileSpreadsheet className="w-5 h-5" />
                     <span className="text-sm">.xlsx</span>
                 </div>
             </div>
 
             {error ? (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <div className="rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
                     {error}
                 </div>
             ) : null}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                 {templates.map((t) => (
-                    <Card key={t.master} className="border-slate-200">
+                    <Card key={t.master} className="border-border/60">
                         <CardHeader className="pb-3">
-                            <CardTitle className="text-base text-slate-900">
+                            <CardTitle className="text-base text-foreground">
                                 {t.label}
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="pt-0">
                             <Button
-                                className="w-full gap-2 bg-blue-600 hover:bg-blue-700"
+                                className="w-full gap-2 bg-foreground text-background hover:bg-foreground/90 shadow-soft"
                                 onClick={() => handleDownload(t.master, t.label)}
                                 disabled={!!downloading[t.master]}
                             >
@@ -112,7 +112,7 @@ const TemplatesPage = () => {
                                 }
                                 Download Template
                             </Button>
-                            <p className="text-xs text-slate-500 mt-3">
+                            <p className="text-xs text-muted-foreground mt-3">
                                 Headers are generated from the database schema.
                             </p>
                         </CardContent>
@@ -124,4 +124,3 @@ const TemplatesPage = () => {
 };
 
 export default TemplatesPage;
-

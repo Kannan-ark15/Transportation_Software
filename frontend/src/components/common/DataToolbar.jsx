@@ -74,7 +74,7 @@ const DataToolbar = ({ onImport, data, columns, title, fileName }) => {
 
             <Button
                 variant="outline"
-                className="gap-2 text-blue-600 bg-blue-50 border-blue-200 hover:bg-blue-100"
+                className="gap-2 text-foreground bg-white/70 border-border/60 hover:bg-muted/70"
                 onClick={() => fileInputRef.current.click()}
                 disabled={importing}
             >
@@ -84,7 +84,7 @@ const DataToolbar = ({ onImport, data, columns, title, fileName }) => {
 
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="gap-2 text-green-600 bg-green-50 border-green-200 hover:bg-green-100">
+                    <Button variant="outline" className="gap-2 text-accent bg-accent/10 border-border/60 hover:bg-accent/15">
                         <Download className="w-4 h-4" />
                         Export
                     </Button>
@@ -93,10 +93,10 @@ const DataToolbar = ({ onImport, data, columns, title, fileName }) => {
                     <DropdownMenuLabel>Choose Format</DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={handleExportExcel} className="gap-2 cursor-pointer">
-                        <FileSpreadsheet className="w-4 h-4 text-green-600" /> Excel (.xlsx)
+                        <FileSpreadsheet className="w-4 h-4 text-accent" /> Excel (.xlsx)
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={handleExportPDF} className="gap-2 cursor-pointer">
-                        <FileText className="w-4 h-4 text-red-600" /> PDF (.pdf)
+                        <FileText className="w-4 h-4 text-destructive" /> PDF (.pdf)
                     </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>

@@ -44,9 +44,9 @@ const Pagination = ({
     }
 
     return (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4 px-2 bg-slate-50/30 rounded-lg">
-            <div className="text-sm font-medium text-slate-500">
-                Showing <span className="text-slate-900">{Math.min((currentPage - 1) * itemsPerPage + 1, totalItems)}</span> to <span className="text-slate-900">{Math.min(currentPage * itemsPerPage, totalItems)}</span> of <span className="text-slate-900">{totalItems}</span> entries
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4 px-2 bg-muted/40 rounded-lg">
+            <div className="text-sm font-medium text-muted-foreground">
+                Showing <span className="text-foreground">{Math.min((currentPage - 1) * itemsPerPage + 1, totalItems)}</span> to <span className="text-foreground">{Math.min(currentPage * itemsPerPage, totalItems)}</span> of <span className="text-foreground">{totalItems}</span> entries
             </div>
 
             <div className="flex items-center gap-6">
@@ -73,7 +73,7 @@ const Pagination = ({
                     <div className="flex items-center gap-1 mx-2">
                         {visiblePages.map((page, index) => (
                             page === '...' ? (
-                                <span key={index} className="px-2 text-slate-400">...</span>
+                                <span key={index} className="px-2 text-muted-foreground/70">...</span>
                             ) : (
                                 <Button
                                     key={index}
@@ -81,7 +81,9 @@ const Pagination = ({
                                     size="sm"
                                     className={cn(
                                         "h-8 w-8 p-0 transition-all font-medium",
-                                        page === currentPage ? "bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-200" : "text-slate-600"
+                                        page === currentPage
+                                            ? "bg-foreground text-background hover:bg-foreground/90 shadow-soft"
+                                            : "text-muted-foreground"
                                     )}
                                     onClick={() => onPageChange(page)}
                                 >
@@ -112,12 +114,12 @@ const Pagination = ({
                 </div>
 
                 <div className="flex items-center gap-2">
-                    <span className="text-sm text-slate-500 font-medium">Show</span>
+                    <span className="text-sm text-muted-foreground font-medium">Show</span>
                     <Select
                         value={itemsPerPage.toString()}
                         onValueChange={(val) => onItemsPerPageChange(parseInt(val))}
                     >
-                        <SelectTrigger className="h-8 w-[70px] bg-white border-slate-200">
+                        <SelectTrigger className="h-8 w-[70px] bg-white/70 border-border/60">
                             <SelectValue placeholder={itemsPerPage} />
                         </SelectTrigger>
                         <SelectContent>
