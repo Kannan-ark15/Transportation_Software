@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
+import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import CompanyList from './components/CompanyList';
 import ProductList from './components/ProductList';
@@ -15,11 +16,27 @@ import RateCardList from './components/RateCardList';
 import TemplatesPage from './components/TemplatesPage';
 
 function App() {
+    const isAuthenticated = () => Boolean(localStorage.getItem('auth_user'));
+
+    const RequireAuth = ({ children }) => {
+        return isAuthenticated() ? children : <Navigate to="/login" replace />;
+    };
+
+    const ProtectedLayout = () => (
+        <RequireAuth>
+            <Layout />
+        </RequireAuth>
+    );
+
     return (
         <Router>
             <div className="App">
-                <Layout>
-                    <Routes>
+                <Routes>
+                    <Route
+                        path="/login"
+                        element={isAuthenticated() ? <Navigate to="/" replace /> : <Login />}
+                    />
+                    <Route element={<ProtectedLayout />}>
                         <Route path="/" element={<Dashboard />} />
                         <Route path="/masters/company" element={<CompanyList />} />
                         <Route path="/masters/products" element={<ProductList />} />
@@ -32,9 +49,9 @@ function App() {
                         <Route path="/masters/banks" element={<BankList />} />
                         <Route path="/masters/rate-cards" element={<RateCardList />} />
                         <Route path="/templates" element={<TemplatesPage />} />
-                        <Route path="*" element={<Navigate to="/" replace />} />
-                    </Routes>
-                </Layout>
+                    </Route>
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
             </div>
         </Router>
     );

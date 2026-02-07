@@ -50,14 +50,15 @@ const Sidebar = () => {
             hasSubmenu: true,
             submenu: [
                 { label: 'Company Master', path: '/masters/company' },
-                { label: 'Product Master', path: '/masters/products' },
+                { label: 'Owner Master', path: '/masters/owners' },
+                { label: 'Vehicle Master', path: '/masters/vehicles' },
                 { label: 'Driver Master', path: '/masters/drivers' },
                 { label: 'Pump Master', path: '/masters/pumps' },
+                { label: 'Product Master', path: '/masters/products' },
                 { label: 'Place Master', path: '/masters/places' },
                 { label: 'Dealer Master', path: '/masters/dealers' },
-                { label: 'Vehicle Master', path: '/masters/vehicles' },
-                { label: 'Owner Master', path: '/masters/owners' },
                 { label: 'Bank Master', path: '/masters/banks' },
+                { label: 'User', path: '/masters/users' },
                 { label: 'Rate Card Master', path: '/masters/rate-cards' }
             ]
         },

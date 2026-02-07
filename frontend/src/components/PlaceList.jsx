@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import DataToolbar from './common/DataToolbar';
 import { placeAPI, companyAPI, productAPI } from '../services/api';
 import Pagination from './Pagination';
@@ -65,8 +65,62 @@ const PlaceList = () => {
     const [formData, setFormData] = useState({
         company_id: '', from_place: '', to_place: '', district: '', distance_km: '', product_id: ''
     });
+    const [rateChartRows, setRateChartRows] = useState([]);
+    const [rateChartLoading, setRateChartLoading] = useState(false);
+    const [rateChartNotice, setRateChartNotice] = useState('');
+    const rateChartNoticeTimeout = useRef(null);
+
+    const vehicleTypes = ['LCV', 'HCV'];
+    const subTypesMap = {
+        'LCV': ['6 WHEELER'],
+        'HCV': ['14 WHEELER', '16 WHEELER', '22 WHEELER']
+    };
+    const bodyTypesMap = {
+        '6 WHEELER': ['Open Container', 'Container'],
+        '14 WHEELER': ['Open Container', 'Container', 'Bulker'],
+        '16 WHEELER': ['Open Container', 'Container', 'Bulker'],
+        '22 WHEELER': ['Trailer', 'Container']
+    };
+
+    const rateTypeOptions = vehicleTypes.flatMap((vehicleType) =>
+        (subTypesMap[vehicleType] || []).flatMap((subType) =>
+            (bodyTypesMap[subType] || []).map((bodyType) => ({
+                value: `${vehicleType}|${subType}|${bodyType}`,
+                label: `${vehicleType} - ${subType} - ${bodyType}`,
+                vehicle_type: vehicleType,
+                vehicle_sub_type: subType,
+                vehicle_body_type: bodyType
+            }))
+        )
+    );
+
+    const createRateChartRow = (data = {}) => ({
+        _key: data.id ? `rate-${data.id}` : `rate-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        vehicle_type: data.vehicle_type || '',
+        vehicle_sub_type: data.vehicle_sub_type || '',
+        vehicle_body_type: data.vehicle_body_type || '',
+        rcl_freight: data.rcl_freight ?? '',
+        kt_freight: data.kt_freight ?? '',
+        driver_bata: data.driver_bata ?? '',
+        advance: data.advance ?? '',
+        unloading: data.unloading ?? '',
+        tarpaulin: data.tarpaulin ?? '',
+        city_tax: data.city_tax ?? '',
+        maintenance: data.maintenance ?? ''
+    });
+
+    const getRateTypeKey = (row) => (
+        row.vehicle_type && row.vehicle_sub_type && row.vehicle_body_type
+            ? `${row.vehicle_type}|${row.vehicle_sub_type}|${row.vehicle_body_type}`
+            : ''
+    );
 
     useEffect(() => { loadData(); }, []);
+    useEffect(() => {
+        return () => {
+            if (rateChartNoticeTimeout.current) clearTimeout(rateChartNoticeTimeout.current);
+        };
+    }, []);
 
     const loadData = async () => {
         try {
@@ -139,9 +193,11 @@ const PlaceList = () => {
         { header: 'Product', dataKey: 'product_name' },
     ];
 
-    const handleOpenModal = (mode, place = null) => {
+    const handleOpenModal = async (mode, place = null) => {
         setModalMode(mode);
         setSelectedPlace(place);
+        setError('');
+
         if (place) {
             setFormData({
                 company_id: place.company_id.toString(),
@@ -151,10 +207,40 @@ const PlaceList = () => {
                 distance_km: place.distance_km,
                 product_id: place.product_id.toString()
             });
+            setRateChartRows([]);
         } else {
             setFormData({ company_id: '', from_place: '', to_place: '', district: '', distance_km: '', product_id: '' });
+            setRateChartRows([createRateChartRow()]);
         }
+
         setModalOpen(true);
+
+        if (place && (mode === 'edit' || mode === 'view')) {
+            try {
+                setRateChartLoading(true);
+                const detailRes = await placeAPI.getById(place.id);
+                if (detailRes.success) {
+                    const detail = detailRes.data;
+                    setFormData({
+                        company_id: detail.company_id?.toString() || '',
+                        from_place: detail.from_place || '',
+                        to_place: detail.to_place || '',
+                        district: detail.district || '',
+                        distance_km: detail.distance_km || '',
+                        product_id: detail.product_id?.toString() || ''
+                    });
+                    const chartRows = Array.isArray(detail.rate_cards) && detail.rate_cards.length > 0
+                        ? detail.rate_cards.map(createRateChartRow)
+                        : [createRateChartRow()];
+                    setRateChartRows(chartRows);
+                }
+            } catch (err) {
+                setError('Failed to load rate chart details');
+                setRateChartRows([createRateChartRow()]);
+            } finally {
+                setRateChartLoading(false);
+            }
+        }
     };
 
     const handleCompanyChange = (companyId) => {
@@ -166,13 +252,87 @@ const PlaceList = () => {
         });
     };
 
+    const handleAddRateRow = () => {
+        setRateChartRows(prev => [...prev, createRateChartRow()]);
+    };
+
+    const handleRemoveRateRow = (index) => {
+        if (rateChartRows.length <= 1) {
+            setRateChartNotice('At least one rate card is mandatory.');
+            if (rateChartNoticeTimeout.current) clearTimeout(rateChartNoticeTimeout.current);
+            rateChartNoticeTimeout.current = setTimeout(() => setRateChartNotice(''), 2500);
+            return;
+        }
+        setRateChartRows(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const handleRateTypeChange = (index, value) => {
+        const selected = rateTypeOptions.find(option => option.value === value);
+        if (!selected) return;
+        setRateChartRows(prev => prev.map((row, i) => (
+            i === index
+                ? {
+                    ...row,
+                    vehicle_type: selected.vehicle_type,
+                    vehicle_sub_type: selected.vehicle_sub_type,
+                    vehicle_body_type: selected.vehicle_body_type
+                }
+                : row
+        )));
+    };
+
+    const handleRateRowChange = (index, field, value) => {
+        setRateChartRows(prev => prev.map((row, i) => {
+            if (i !== index) return row;
+            const updated = { ...row, [field]: value };
+            if (field === 'rcl_freight') {
+                const parsed = parseFloat(value);
+                updated.kt_freight = Number.isFinite(parsed) ? (Math.floor(parsed) - 1).toString() : '';
+            }
+            return updated;
+        }));
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
             setSubmitting(true);
+            const sanitizedRateCards = rateChartRows
+                .map(({ _key, ...rest }) => rest)
+                .filter(row => Object.values(row).some(val => val !== '' && val !== null && val !== undefined));
+
+            if (sanitizedRateCards.length === 0) {
+                setError('Please add at least one rate chart entry.');
+                setSubmitting(false);
+                return;
+            }
+
+            const missingRequired = sanitizedRateCards.some(row => !row.vehicle_type || !row.vehicle_sub_type || !row.vehicle_body_type || row.rcl_freight === '' || row.rcl_freight === null || row.rcl_freight === undefined);
+            if (missingRequired) {
+                setError('Please complete required rate chart fields (Type and RCL Freight).');
+                setSubmitting(false);
+                return;
+            }
+
+            const rateCardsPayload = sanitizedRateCards.map(row => {
+                const rcl = parseFloat(row.rcl_freight);
+                const kt = row.kt_freight !== '' && row.kt_freight !== null && row.kt_freight !== undefined
+                    ? row.kt_freight
+                    : (Number.isFinite(rcl) ? Math.floor(rcl) - 1 : '');
+                return {
+                    ...row,
+                    kt_freight: kt
+                };
+            });
+
+            const payload = {
+                ...formData,
+                rate_cards: rateCardsPayload
+            };
+
             let res;
-            if (modalMode === 'add') res = await placeAPI.create(formData);
-            else res = await placeAPI.update(selectedPlace.id, formData);
+            if (modalMode === 'add') res = await placeAPI.create(payload);
+            else res = await placeAPI.update(selectedPlace.id, payload);
 
             if (res.success) {
                 setSuccessMsg(`Route ${modalMode === 'add' ? 'created' : 'updated'} successfully`);
@@ -353,7 +513,7 @@ const PlaceList = () => {
             </Card>
 
             <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-                <DialogContent className="sm:max-w-[500px]">
+                <DialogContent className="min-w-0 w-[96vw] max-w-[1100px] max-h-[90vh] overflow-y-auto overflow-x-hidden">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2 text-xl font-bold">
                             {modalMode === 'add' ? <Plus className="w-5 h-5 text-orange-600" /> : modalMode === 'edit' ? <Edit className="w-5 h-5 text-amber-600" /> : <Eye className="w-5 h-5 text-blue-600" />}
@@ -361,7 +521,7 @@ const PlaceList = () => {
                         </DialogTitle>
                     </DialogHeader>
 
-                    <form onSubmit={handleSubmit} className="space-y-4 py-4">
+                    <form onSubmit={handleSubmit} className="min-w-0 space-y-4 py-4">
                         <div className="space-y-2">
                             <Label htmlFor="company" className="required flex items-center gap-2">
                                 <Building className="w-3 h-3 text-slate-400" /> Client Company
@@ -461,6 +621,194 @@ const PlaceList = () => {
                             </Select>
                         </div>
 
+                        <div className="space-y-3 pt-2">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                                <div className="space-y-1">
+                                    <Label className="text-base font-semibold text-slate-900">Rate Chart</Label>
+                                    <p className="text-xs text-slate-500">Add one or more rate cards for this place.</p>
+                                </div>
+                                {modalMode !== 'view' && (
+                                        <Button type="button" variant="outline" onClick={handleAddRateRow}>
+                                            <Plus className="w-4 h-4 mr-2" />
+                                            Add Another
+                                        </Button>
+                                )}
+                            </div>
+
+                            <div className="min-w-0 w-full max-w-full rounded-lg border border-slate-200 overflow-x-auto bg-white">
+                                {rateChartLoading ? (
+                                    <div className="flex items-center justify-center gap-2 py-10 text-slate-500">
+                                        <Loader2 className="h-5 w-5 animate-spin text-orange-600" />
+                                        Loading rate chart...
+                                    </div>
+                                ) : (
+                                    <table className="min-w-[1200px] w-full text-xs">
+                                        <thead className="bg-slate-50">
+                                            <tr>
+                                                <th className="px-3 py-2 text-left font-semibold text-slate-700">Type *</th>
+                                                <th className="px-3 py-2 text-left font-semibold text-slate-700">RCL Freight *</th>
+                                                <th className="px-3 py-2 text-left font-semibold text-slate-700">KT Freight *</th>
+                                                <th className="px-3 py-2 text-left font-semibold text-slate-700">Driver Bata</th>
+                                                <th className="px-3 py-2 text-left font-semibold text-slate-700">Advance</th>
+                                                <th className="px-3 py-2 text-left font-semibold text-slate-700">Unloading</th>
+                                                <th className="px-3 py-2 text-left font-semibold text-slate-700">Tarpaulin</th>
+                                                <th className="px-3 py-2 text-left font-semibold text-slate-700">City Tax</th>
+                                                <th className="px-3 py-2 text-left font-semibold text-slate-700">Maintenance</th>
+                                                <th className="px-3 py-2 text-center font-semibold text-slate-700">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {rateChartRows.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={10} className="py-8 text-center text-slate-500">
+                                                        No rate chart entries yet.
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                rateChartRows.map((row, index) => (
+                                                    <tr key={row._key} className="border-t border-slate-100">
+                                                        <td className="px-3 py-2 min-w-[260px]">
+                                                            <Select
+                                                                value={getRateTypeKey(row)}
+                                                                onValueChange={(value) => handleRateTypeChange(index, value)}
+                                                                disabled={modalMode === 'view'}
+                                                            >
+                                                                <SelectTrigger className="h-9 text-xs">
+                                                                    <SelectValue placeholder="Select type" />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    {rateTypeOptions.map(option => (
+                                                                        <SelectItem key={option.value} value={option.value}>
+                                                                            {option.label}
+                                                                        </SelectItem>
+                                                                    ))}
+                                                                </SelectContent>
+                                                            </Select>
+                                                        </td>
+                                                        <td className="px-3 py-2">
+                                                            <Input
+                                                                type="number"
+                                                                value={row.rcl_freight}
+                                                                disabled={modalMode === 'view'}
+                                                                onChange={(e) => handleRateRowChange(index, 'rcl_freight', e.target.value)}
+                                                                className="h-9 text-xs"
+                                                                placeholder="Enter RCL"
+                                                                required
+                                                            />
+                                                        </td>
+                                                        <td className="px-3 py-2">
+                                                            <Input
+                                                                type="number"
+                                                                value={row.kt_freight}
+                                                                disabled={modalMode === 'view'}
+                                                                onChange={(e) => handleRateRowChange(index, 'kt_freight', e.target.value)}
+                                                                className="h-9 text-xs"
+                                                                placeholder="Enter KT"
+                                                            />
+                                                        </td>
+                                                        <td className="px-3 py-2">
+                                                            <Input
+                                                                type="number"
+                                                                value={row.driver_bata}
+                                                                disabled={modalMode === 'view'}
+                                                                onChange={(e) => handleRateRowChange(index, 'driver_bata', e.target.value)}
+                                                                className="h-9 text-xs"
+                                                                placeholder="Enter bata"
+                                                            />
+                                                        </td>
+                                                        <td className="px-3 py-2">
+                                                            <Input
+                                                                type="number"
+                                                                value={row.advance}
+                                                                disabled={modalMode === 'view'}
+                                                                onChange={(e) => handleRateRowChange(index, 'advance', e.target.value)}
+                                                                className="h-9 text-xs"
+                                                                placeholder="Enter advance"
+                                                            />
+                                                        </td>
+                                                        <td className="px-3 py-2">
+                                                            <Input
+                                                                type="number"
+                                                                value={row.unloading}
+                                                                disabled={modalMode === 'view'}
+                                                                onChange={(e) => handleRateRowChange(index, 'unloading', e.target.value)}
+                                                                className="h-9 text-xs"
+                                                                placeholder="Enter unloading"
+                                                            />
+                                                        </td>
+                                                        <td className="px-3 py-2">
+                                                            <Input
+                                                                type="number"
+                                                                value={row.tarpaulin}
+                                                                disabled={modalMode === 'view'}
+                                                                onChange={(e) => handleRateRowChange(index, 'tarpaulin', e.target.value)}
+                                                                className="h-9 text-xs"
+                                                                placeholder="Enter tarpaulin"
+                                                            />
+                                                        </td>
+                                                        <td className="px-3 py-2">
+                                                            <Input
+                                                                type="number"
+                                                                value={row.city_tax}
+                                                                disabled={modalMode === 'view'}
+                                                                onChange={(e) => handleRateRowChange(index, 'city_tax', e.target.value)}
+                                                                className="h-9 text-xs"
+                                                                placeholder="Enter city tax"
+                                                            />
+                                                        </td>
+                                                        <td className="px-3 py-2">
+                                                            <Input
+                                                                type="number"
+                                                                value={row.maintenance}
+                                                                disabled={modalMode === 'view'}
+                                                                onChange={(e) => handleRateRowChange(index, 'maintenance', e.target.value)}
+                                                                className="h-9 text-xs"
+                                                                placeholder="Enter maintenance"
+                                                            />
+                                                        </td>
+                                                        <td className="px-3 py-2 text-center">
+                                                            {modalMode !== 'view' ? (
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-8 w-8 text-slate-500 hover:text-red-600 hover:bg-red-50"
+                                                                onClick={() => handleRemoveRateRow(index)}
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        ) : (
+                                                            <span className="text-slate-300">—</span>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+
+                            {modalMode !== 'view' && (
+                                <div className="flex justify-start">
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={handleAddRateRow}
+                                        className="h-8 px-3 text-xs"
+                                    >
+                                        <Plus className="w-3 h-3 mr-1" />
+                                        Add Rate Card
+                                    </Button>
+                                </div>
+                            )}
+
+                            <p className="text-[11px] text-slate-400">
+                                KT Freight auto-calculates from RCL Freight unless manually overridden.
+                            </p>
+                        </div>
+
                         <DialogFooter className="pt-6 border-t border-slate-100">
                             {modalMode !== 'view' ? (
                                 <>
@@ -486,6 +834,12 @@ const PlaceList = () => {
                             )}
                         </DialogFooter>
                     </form>
+
+                    {rateChartNotice && (
+                        <div className="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-lg">
+                            {rateChartNotice}
+                        </div>
+                    )}
                 </DialogContent>
             </Dialog>
         </div>

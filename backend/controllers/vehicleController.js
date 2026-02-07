@@ -21,7 +21,7 @@ const createVehicle = async (req, res, next) => {
         const fields = [
             'vehicle_no', 'vehicle_type', 'vehicle_sub_type', 'vehicle_body_type', 'brand_name',
             'own_dedicated', 'owner_name', 'recommended_km', 'engine_no', 'chasis_no',
-            'rc_expiry_date', 'pollution_no', 'pollution_expiry_date', 'permit_no', 'permit_from_date',
+            'pollution_no', 'pollution_expiry_date', 'permit_no', 'permit_from_date',
             'permit_till_date', 'insurance_no', 'insurance_base_value', 'gst_percent', 'gst_value',
             'insurance_amount', 'fc_no', 'fc_from_date', 'fc_till_date', 'status'
         ];
@@ -47,7 +47,7 @@ const updateVehicle = async (req, res, next) => {
         const fields = [
             'vehicle_no', 'vehicle_type', 'vehicle_sub_type', 'vehicle_body_type', 'brand_name',
             'own_dedicated', 'owner_name', 'recommended_km', 'engine_no', 'chasis_no',
-            'rc_expiry_date', 'pollution_no', 'pollution_expiry_date', 'permit_no', 'permit_from_date',
+            'pollution_no', 'pollution_expiry_date', 'permit_no', 'permit_from_date',
             'permit_till_date', 'insurance_no', 'insurance_base_value', 'gst_percent', 'gst_value',
             'insurance_amount', 'fc_no', 'fc_from_date', 'fc_till_date', 'status'
         ];

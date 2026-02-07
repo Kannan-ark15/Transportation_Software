@@ -9,7 +9,6 @@ import {
     Trash2,
     Truck,
     MapPin,
-    Calendar,
     FileText,
     Hash,
     SearchX,
@@ -82,8 +81,6 @@ const VehicleList = () => {
         recommended_km: '',
         engine_no: '',
         chasis_no: '',
-        rc_expiry_date: '',
-        rc_document: null,
         pollution_no: '',
         pollution_expiry_date: '',
         pollution_document: null,
@@ -207,7 +204,6 @@ const VehicleList = () => {
                     chasis_no: row['Chasis No'] || row['chasis_no'],
 
                     // Dates - Apply Parsing
-                    rc_expiry_date: parseDate(row['RC Expiry']) || parseDate(row['rc_expiry_date']),
                     pollution_expiry_date: parseDate(row['Pollution Expiry']) || parseDate(row['pollution_expiry_date']),
                     permit_from_date: parseDate(row['Permit From']) || parseDate(row['permit_from_date']),
                     permit_till_date: parseDate(row['Permit Till']) || parseDate(row['permit_till_date']),
@@ -253,7 +249,6 @@ const VehicleList = () => {
         { header: 'Type', dataKey: 'vehicle_type' },
         { header: 'Sub Type', dataKey: 'vehicle_sub_type' },
         { header: 'Owner', dataKey: 'owner_name' },
-        { header: 'Expiry', dataKey: 'rc_expiry_date' },
         { header: 'Status', dataKey: 'status' },
     ];
 
@@ -276,8 +271,6 @@ const VehicleList = () => {
                 recommended_km: '',
                 engine_no: '',
                 chasis_no: '',
-                rc_expiry_date: '',
-                rc_document: null,
                 pollution_no: '',
                 pollution_expiry_date: '',
                 pollution_document: null,
@@ -306,7 +299,7 @@ const VehicleList = () => {
         const mandatoryFields = [
             'vehicle_no', 'vehicle_type', 'vehicle_sub_type', 'vehicle_body_type',
             'brand_name', 'own_dedicated', 'owner_name', 'recommended_km',
-            'rc_expiry_date', 'pollution_no', 'pollution_expiry_date',
+            'pollution_no', 'pollution_expiry_date',
             'permit_no', 'permit_from_date', 'permit_till_date',
             'insurance_no', 'insurance_base_value', 'fc_no',
             'fc_from_date', 'fc_till_date'
@@ -431,7 +424,6 @@ const VehicleList = () => {
                                             <TableHead className="w-[80px] font-bold text-slate-700">S.No</TableHead>
                                             <TableHead className="font-bold text-slate-700">Vehicle Info</TableHead>
                                             <TableHead className="font-bold text-slate-700">Type / Owner</TableHead>
-                                            <TableHead className="font-bold text-slate-700">RC Expiry</TableHead>
                                             <TableHead className="font-bold text-slate-700">Status</TableHead>
                                             <TableHead className="text-right font-bold text-slate-700">Actions</TableHead>
                                         </TableRow>
@@ -449,12 +441,6 @@ const VehicleList = () => {
                                                 <TableCell>
                                                     <div className="text-sm font-medium text-slate-900">{v.vehicle_type} - {v.vehicle_sub_type}</div>
                                                     <div className="text-xs text-slate-500">{v.own_dedicated}: {v.owner_name}</div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="flex items-center gap-1.5 text-slate-600 text-sm">
-                                                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                                                        {new Date(v.rc_expiry_date).toLocaleDateString()}
-                                                    </div>
                                                 </TableCell>
                                                 <TableCell>
                                                     <Badge className={cn(
@@ -622,9 +608,9 @@ const VehicleList = () => {
                         {/* Section: Technical Details */}
                         <div className="space-y-4">
                             <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                                <Settings className="w-4 h-4" /> Technical & RC Details
+                                <Settings className="w-4 h-4" /> Technical Details
                             </h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="engine_no">Engine Number</Label>
                                     <Input id="engine_no" value={formData.engine_no} onChange={e => setFormData({ ...formData, engine_no: e.target.value })} />
@@ -632,21 +618,6 @@ const VehicleList = () => {
                                 <div className="space-y-2">
                                     <Label htmlFor="chasis_no">Chasis Number</Label>
                                     <Input id="chasis_no" value={formData.chasis_no} onChange={e => setFormData({ ...formData, chasis_no: e.target.value })} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="rc_expiry" className="required text-xs">RC Expiry Date</Label>
-                                    <div className="relative">
-                                        <Input id="rc_expiry" type="date" value={formData.rc_expiry_date} onChange={e => setFormData({ ...formData, rc_expiry_date: e.target.value })} />
-                                    </div>
-                                    {formErrors.rc_expiry_date && <p className="text-[10px] text-red-500">{formErrors.rc_expiry_date}</p>}
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="required text-xs">RC Document</Label>
-                                    <div className="flex gap-2">
-                                        <Button type="button" variant="outline" size="sm" className="w-full flex items-center gap-2 text-xs">
-                                            <Upload className="w-3 h-3" /> Upload
-                                        </Button>
-                                    </div>
                                 </div>
                             </div>
                         </div>

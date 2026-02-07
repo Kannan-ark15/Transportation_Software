@@ -3,12 +3,15 @@ const PlaceModel = require('../models/placeModel');
 class PlaceController {
     static async createPlace(req, res) {
         try {
-            const placeData = req.body;
+            const placeData = { ...req.body };
+            const rateCards = Array.isArray(placeData.rate_cards) ? placeData.rate_cards : [];
+            delete placeData.rate_cards;
+
             const exists = await PlaceModel.existsCombination(placeData.to_place, placeData.product_id);
             if (exists) {
                 return res.status(400).json({ success: false, message: 'This Place and Product combination already exists' });
             }
-            const newPlace = await PlaceModel.create(placeData);
+            const newPlace = await PlaceModel.createWithRateCards(placeData, rateCards);
             res.status(201).json({ success: true, message: 'Place created successfully', data: newPlace });
         } catch (error) {
             console.error('Error creating place:', error);
@@ -29,7 +32,7 @@ class PlaceController {
     static async getPlaceById(req, res) {
         try {
             const { id } = req.params;
-            const place = await PlaceModel.findById(id);
+            const place = await PlaceModel.findByIdWithRateCards(id);
             if (!place) return res.status(404).json({ success: false, message: 'Place not found' });
             res.status(200).json({ success: true, data: place });
         } catch (error) {
@@ -41,12 +44,17 @@ class PlaceController {
     static async updatePlace(req, res) {
         try {
             const { id } = req.params;
-            const placeData = req.body;
+            const placeData = { ...req.body };
+            const rateCards = Array.isArray(placeData.rate_cards) ? placeData.rate_cards : null;
+            delete placeData.rate_cards;
+
             const exists = await PlaceModel.existsCombination(placeData.to_place, placeData.product_id, id);
             if (exists) {
                 return res.status(400).json({ success: false, message: 'This Place and Product combination already exists' });
             }
-            const updatedPlace = await PlaceModel.update(id, placeData);
+            const updatedPlace = Array.isArray(rateCards)
+                ? await PlaceModel.updateWithRateCards(id, placeData, rateCards)
+                : await PlaceModel.update(id, placeData);
             res.status(200).json({ success: true, message: 'Place updated successfully', data: updatedPlace });
         } catch (error) {
             console.error('Error updating place:', error);

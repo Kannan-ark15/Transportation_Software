@@ -65,6 +65,31 @@ CREATE TABLE IF NOT EXISTS places (
     UNIQUE(to_place, product_id) -- Unique Place + Product Combination as per rules
 );
 
+-- 4A. PLACE RATE CHART MAPPING (Place <-> Rate Cards)
+CREATE TABLE IF NOT EXISTS place_rate_cards (
+    id SERIAL PRIMARY KEY,
+    place_id INTEGER REFERENCES places(id) ON DELETE CASCADE,
+    rate_card_id INTEGER REFERENCES rate_cards(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(place_id, rate_card_id)
+);
+
+-- 4B. LOGIN USERS
+CREATE TABLE IF NOT EXISTS login_users (
+    id SERIAL PRIMARY KEY,
+    full_name VARCHAR(255),
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    password_salt VARCHAR(255) NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Vehicle Master cleanup: remove RC fields
+ALTER TABLE IF EXISTS vehicles DROP COLUMN IF EXISTS rc_expiry_date;
+ALTER TABLE IF EXISTS vehicles DROP COLUMN IF EXISTS rc_document;
+
 -- 5. DEALER MASTER
 CREATE TABLE IF NOT EXISTS dealers (
     id SERIAL PRIMARY KEY,
@@ -94,7 +119,7 @@ DO $$
 DECLARE
     t text;
 BEGIN
-    FOR t IN SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('products', 'drivers', 'pumps', 'places', 'dealers')
+    FOR t IN SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('products', 'drivers', 'pumps', 'places', 'dealers', 'login_users')
     LOOP
         EXECUTE format('DROP TRIGGER IF EXISTS update_%I_updated_at ON %I', t, t);
         EXECUTE format('CREATE TRIGGER update_%I_updated_at BEFORE UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()', t, t);

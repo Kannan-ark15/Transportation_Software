@@ -14,7 +14,6 @@ const data = [
         "Year": 2022,
         "Engine No": "ENG1001",
         "Chasis No": "CHS1001",
-        "RC Expiry": new Date("2026-12-31"),
         "Pollution No": "PUC1001",
         "Pollution Expiry": new Date("2025-06-30"),
         "Permit No": "PER1001",
@@ -40,7 +39,6 @@ const data = [
         "Year": 2023,
         "Engine No": "ENG2002",
         "Chasis No": "CHS2002",
-        "RC Expiry": "2027-12-31", // String format test
         "Pollution No": "PUC2002",
         "Pollution Expiry": "2025-12-31",
         "Permit No": "PER2002",

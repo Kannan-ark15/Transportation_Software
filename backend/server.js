@@ -13,6 +13,7 @@ const ownerRoutes = require('./routes/ownerRoutes');
 const bankRoutes = require('./routes/bankRoutes');
 const rateCardRoutes = require('./routes/rateCardRoutes');
 const templateRoutes = require('./routes/templateRoutes');
+const authRoutes = require('./routes/authRoutes');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
 
 const app = express();
@@ -53,6 +54,7 @@ app.use('/api/owners', ownerRoutes);
 app.use('/api/banks', bankRoutes);
 app.use('/api/rate-cards', rateCardRoutes);
 app.use('/api/templates', templateRoutes);
+app.use('/api/auth', authRoutes);
 
 // 404 handler
 app.use(notFound);

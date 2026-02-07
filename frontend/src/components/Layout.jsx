@@ -1,4 +1,5 @@
 import React from 'react';
+import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import { Search, Bell, Settings, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -54,11 +55,13 @@ const LayoutContent = ({ children }) => {
 };
 
 const Layout = ({ children }) => {
+    const content = children ?? <Outlet />;
+
     return (
         <SidebarProvider>
             <Sidebar />
             <LayoutContent>
-                {children}
+                {content}
             </LayoutContent>
         </SidebarProvider>
     );
