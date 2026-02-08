@@ -117,7 +117,8 @@ const VehicleList = () => {
     };
     const ownersMap = {
         'Own': ['Admin Services', 'Fleet Management'],
-        'Dedicated': ['External Partner A', 'Logistics Corp B', 'Express Delivery C']
+        'Dedicated': ['External Partner A', 'Logistics Corp B', 'Express Delivery C'],
+        'Market': ['External Partner A', 'Logistics Corp B', 'Express Delivery C']
     };
 
     useEffect(() => { loadVehicles(); }, []);
@@ -581,6 +582,7 @@ const VehicleList = () => {
                                         <SelectContent>
                                             <SelectItem value="Own">Own</SelectItem>
                                             <SelectItem value="Dedicated">Dedicated</SelectItem>
+                                            <SelectItem value="Market">Market</SelectItem>
                                         </SelectContent>
                                     </Select>
                                     {formErrors.own_dedicated && <p className="text-[10px] text-red-500">{formErrors.own_dedicated}</p>}

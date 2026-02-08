@@ -43,6 +43,13 @@ export const vehicleAPI = generateCRUD('/vehicles');
 export const ownerAPI = generateCRUD('/owners');
 export const bankAPI = generateCRUD('/banks');
 export const rateCardAPI = generateCRUD('/rate-cards');
+export const loadingAdvanceAPI = {
+    ...generateCRUD('/loading-advances'),
+    getNextVoucher: async (login_prefix) => {
+        const response = await api.get('/loading-advances/next-voucher', { params: { login_prefix } });
+        return response.data;
+    }
+};
 
 export const authAPI = {
     register: async (data) => {

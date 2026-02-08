@@ -8,7 +8,8 @@ import {
     FileText,
     ClipboardList,
     BarChart3,
-    Truck
+    Truck,
+    LogOut
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -31,10 +32,21 @@ import {
     CollapsibleContent,
     CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
 
 const Sidebar = () => {
     const navigate = useNavigate();
     const location = useLocation();
+    const authUser = (() => { try { return JSON.parse(localStorage.getItem('auth_user') || '{}'); } catch { return {}; } })();
+    const displayName = authUser.full_name || authUser.email || 'Admin User';
+    const initials = displayName.split(' ').filter(Boolean).slice(0, 2).map(s => s[0].toUpperCase()).join('') || 'A';
 
     const menuItems = [
         {
@@ -66,7 +78,10 @@ const Sidebar = () => {
             id: 'transactions',
             label: 'Transactions',
             icon: <ClipboardList className="w-5 h-5" />,
-            path: '#'
+            hasSubmenu: true,
+            submenu: [
+                { label: 'Loading Advance', path: '/transactions/loading-advance' }
+            ]
         },
         {
             id: 'templates',
@@ -200,15 +215,32 @@ const Sidebar = () => {
             </SidebarContent>
 
             <SidebarFooter className="p-4 border-t border-white/10">
-                <div className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
-                    <div className="w-8 h-8 rounded-full bg-white text-[#2f343d] flex items-center justify-center text-sm font-semibold shadow-soft-inset">
-                        A
-                    </div>
-                    <div className="text-left group-data-[collapsible=icon]:hidden">
-                        <p className="text-sm font-medium text-white leading-none">Admin User</p>
-                        <p className="text-xs text-white/60 mt-1">Administrator</p>
-                    </div>
-                </div>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <button className="w-full flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
+                            <div className="w-8 h-8 rounded-full bg-white text-[#2f343d] flex items-center justify-center text-sm font-semibold shadow-soft-inset">
+                                {initials}
+                            </div>
+                            <div className="text-left group-data-[collapsible=icon]:hidden">
+                                <p className="text-sm font-medium text-white leading-none">{displayName}</p>
+                                <p className="text-xs text-white/60 mt-1">Administrator</p>
+                            </div>
+                        </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-48">
+                        <DropdownMenuLabel>Account</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                            className="cursor-pointer"
+                            onClick={() => {
+                                localStorage.removeItem('auth_user');
+                                navigate('/login', { replace: true });
+                            }}
+                        >
+                            <LogOut className="w-4 h-4 mr-2" /> Logout
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </SidebarFooter>
         </ShadcnSidebar>
     );

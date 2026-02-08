@@ -79,12 +79,16 @@ CREATE TABLE IF NOT EXISTS login_users (
     id SERIAL PRIMARY KEY,
     full_name VARCHAR(255),
     email VARCHAR(255) UNIQUE NOT NULL,
+    login_prefix VARCHAR(3) NOT NULL DEFAULT 'HOF',
     password_hash VARCHAR(255) NOT NULL,
     password_salt VARCHAR(255) NOT NULL,
     is_active BOOLEAN DEFAULT TRUE NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE IF EXISTS login_users
+    ADD COLUMN IF NOT EXISTS login_prefix VARCHAR(3) NOT NULL DEFAULT 'HOF';
 
 -- Vehicle Master cleanup: remove RC fields
 ALTER TABLE IF EXISTS vehicles DROP COLUMN IF EXISTS rc_expiry_date;

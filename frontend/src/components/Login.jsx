@@ -2,13 +2,14 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, User } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { authAPI } from '../services/api';
 
 const Login = () => {
     const navigate = useNavigate();
     const [showPassword, setShowPassword] = useState(false);
     const [mode, setMode] = useState('login');
-    const [formData, setFormData] = useState({ full_name: '', email: '', password: '' });
+    const [formData, setFormData] = useState({ full_name: '', email: '', password: '', login_prefix: 'HOF' });
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
     const [notice, setNotice] = useState('');
@@ -28,17 +29,19 @@ const Login = () => {
                 const res = await authAPI.register({
                     full_name: formData.full_name,
                     email: formData.email,
-                    password: formData.password
+                    password: formData.password,
+                    login_prefix: formData.login_prefix
                 });
                 if (res.success) {
                     setNotice('Account created successfully. Please sign in.');
                     setMode('login');
-                    setFormData({ full_name: '', email: formData.email, password: '' });
+                    setFormData({ full_name: '', email: formData.email, password: '', login_prefix: formData.login_prefix || 'HOF' });
                 }
             } else {
                 const res = await authAPI.login({
                     email: formData.email,
-                    password: formData.password
+                    password: formData.password,
+                    login_prefix: formData.login_prefix
                 });
                 if (res.success) {
                     localStorage.setItem('auth_user', JSON.stringify(res.data));
@@ -127,6 +130,27 @@ const Login = () => {
                                     required
                                 />
                             </div>
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-white/80" htmlFor="login_prefix">
+                                Login Branch
+                            </label>
+                            <Select
+                                value={formData.login_prefix}
+                                onValueChange={(val) => setFormData((prev) => ({ ...prev, login_prefix: val }))}
+                            >
+                                <SelectTrigger
+                                    id="login_prefix"
+                                    className="h-12 rounded-2xl border-white/15 bg-white/5 text-sm text-white placeholder:text-white/40 focus-visible:ring-emerald-400/60"
+                                >
+                                    <SelectValue placeholder="Select branch" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="ARY">Ariyalur (ARY)</SelectItem>
+                                    <SelectItem value="PND">Alathiyur (PND)</SelectItem>
+                                    <SelectItem value="HOF">Head Office (HOF)</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
 
                         <div className="space-y-2">
