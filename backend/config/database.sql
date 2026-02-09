@@ -148,3 +148,37 @@ CREATE TRIGGER update_loading_advances_updated_at
     BEFORE UPDATE ON loading_advances
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+-- Acknowledgements (Transactions)
+CREATE TABLE IF NOT EXISTS acknowledgements (
+    id SERIAL PRIMARY KEY,
+    loading_advance_id INTEGER UNIQUE REFERENCES loading_advances(id) ON DELETE CASCADE,
+    voucher_number VARCHAR(20) NOT NULL,
+    voucher_status VARCHAR(20) NOT NULL CHECK (voucher_status IN ('Pending', 'Settled')),
+    voucher_pending_amount DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS acknowledgement_invoices (
+    id SERIAL PRIMARY KEY,
+    acknowledgement_id INTEGER REFERENCES acknowledgements(id) ON DELETE CASCADE,
+    loading_advance_invoice_id INTEGER REFERENCES loading_advance_invoices(id) ON DELETE CASCADE,
+    invoice_number VARCHAR(50) NOT NULL,
+    to_place VARCHAR(255) NOT NULL,
+    quantity DECIMAL(10, 3) NOT NULL,
+    ifa_amount DECIMAL(12, 2) NOT NULL,
+    status VARCHAR(20) NOT NULL CHECK (status IN ('Acknowledged', 'Shortage', 'Pending')),
+    returned_amount DECIMAL(12, 2) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_acknowledgements_loading_advance ON acknowledgements(loading_advance_id);
+CREATE INDEX IF NOT EXISTS idx_acknowledgements_voucher_number ON acknowledgements(voucher_number);
+CREATE INDEX IF NOT EXISTS idx_acknowledgement_invoices_ack_id ON acknowledgement_invoices(acknowledgement_id);
+CREATE INDEX IF NOT EXISTS idx_acknowledgement_invoices_status ON acknowledgement_invoices(status);
+
+CREATE TRIGGER update_acknowledgements_updated_at
+    BEFORE UPDATE ON acknowledgements
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();

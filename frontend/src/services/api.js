@@ -48,8 +48,14 @@ export const loadingAdvanceAPI = {
     getNextVoucher: async (login_prefix) => {
         const response = await api.get('/loading-advances/next-voucher', { params: { login_prefix } });
         return response.data;
+    },
+    getInvoices: async (id) => {
+        const response = await api.get(`/loading-advances/${id}/invoices`);
+        return response.data;
     }
 };
+
+export const acknowledgementAPI = generateCRUD('/acknowledgements');
 
 export const authAPI = {
     register: async (data) => {

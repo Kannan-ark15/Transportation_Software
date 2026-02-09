@@ -80,7 +80,8 @@ const Sidebar = () => {
             icon: <ClipboardList className="w-5 h-5" />,
             hasSubmenu: true,
             submenu: [
-                { label: 'Loading Advance', path: '/transactions/loading-advance' }
+                { label: 'Loading Advance', path: '/transactions/loading-advance' },
+                { label: 'Acknowledgement', path: '/transactions/acknowledgement' }
             ]
         },
         {

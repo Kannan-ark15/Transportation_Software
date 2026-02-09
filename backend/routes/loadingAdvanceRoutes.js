@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { getAllLoadingAdvances, createLoadingAdvance, getNextVoucher } = require('../controllers/loadingAdvanceController');
+const { getAllLoadingAdvances, createLoadingAdvance, getNextVoucher, getLoadingAdvanceInvoices } = require('../controllers/loadingAdvanceController');
 
 router.get('/next-voucher', getNextVoucher);
+router.get('/:id/invoices', getLoadingAdvanceInvoices);
 router.get('/', getAllLoadingAdvances);
 router.post('/', createLoadingAdvance);
 

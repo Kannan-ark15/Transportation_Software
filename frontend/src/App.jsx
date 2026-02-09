@@ -15,6 +15,7 @@ import BankList from './components/BankList';
 import RateCardList from './components/RateCardList';
 import TemplatesPage from './components/TemplatesPage';
 import LoadingAdvance from './components/LoadingAdvance';
+import Acknowledgement from './components/Acknowledgement';
 
 function App() {
     const isAuthenticated = () => Boolean(localStorage.getItem('auth_user'));
@@ -50,6 +51,7 @@ function App() {
                         <Route path="/masters/banks" element={<BankList />} />
                         <Route path="/masters/rate-cards" element={<RateCardList />} />
                         <Route path="/transactions/loading-advance" element={<LoadingAdvance />} />
+                        <Route path="/transactions/acknowledgement" element={<Acknowledgement />} />
                         <Route path="/templates" element={<TemplatesPage />} />
                     </Route>
                     <Route path="*" element={<Navigate to="/" replace />} />

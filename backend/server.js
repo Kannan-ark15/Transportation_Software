@@ -13,6 +13,7 @@ const ownerRoutes = require('./routes/ownerRoutes');
 const bankRoutes = require('./routes/bankRoutes');
 const rateCardRoutes = require('./routes/rateCardRoutes');
 const loadingAdvanceRoutes = require('./routes/loadingAdvanceRoutes');
+const acknowledgementRoutes = require('./routes/acknowledgementRoutes');
 const templateRoutes = require('./routes/templateRoutes');
 const authRoutes = require('./routes/authRoutes');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
@@ -55,6 +56,7 @@ app.use('/api/owners', ownerRoutes);
 app.use('/api/banks', bankRoutes);
 app.use('/api/rate-cards', rateCardRoutes);
 app.use('/api/loading-advances', loadingAdvanceRoutes);
+app.use('/api/acknowledgements', acknowledgementRoutes);
 app.use('/api/templates', templateRoutes);
 app.use('/api/auth', authRoutes);
 

@@ -83,6 +83,22 @@ const getAllLoadingAdvances = async (req, res, next) => {
     } catch (error) { next(error); }
 };
 
+const getLoadingAdvanceInvoices = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query(
+            `SELECT lai.id, lai.invoice_number, lai.to_place, lai.dealer_name, lai.distance_km, lai.kt_freight,
+                    lai.quantity, lai.ifa_amount, la.invoice_date
+             FROM loading_advance_invoices lai
+             JOIN loading_advances la ON la.id = lai.loading_advance_id
+             WHERE lai.loading_advance_id = $1
+             ORDER BY lai.id`,
+            [id]
+        );
+        res.status(200).json({ success: true, data: result.rows });
+    } catch (error) { next(error); }
+};
+
 const createLoadingAdvance = async (req, res, next) => {
     const client = await pool.connect();
     try {
@@ -269,4 +285,4 @@ const createLoadingAdvance = async (req, res, next) => {
     }
 };
 
-module.exports = { getAllLoadingAdvances, createLoadingAdvance, getNextVoucher };
+module.exports = { getAllLoadingAdvances, createLoadingAdvance, getNextVoucher, getLoadingAdvanceInvoices };
