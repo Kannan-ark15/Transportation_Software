@@ -47,7 +47,7 @@ const existsProduct = async (productName) => {
 
 const findPlaceByNameAndProduct = async (to_place, product_name) => {
     const result = await pool.query(
-        `SELECT p.id, p.distance_km
+        `SELECT p.id
          FROM places p
          JOIN products pr ON p.product_id = pr.id
          WHERE p.to_place = $1 AND pr.product_name = $2
@@ -87,7 +87,7 @@ const getLoadingAdvanceInvoices = async (req, res, next) => {
     try {
         const { id } = req.params;
         const result = await pool.query(
-            `SELECT lai.id, lai.invoice_number, lai.to_place, lai.dealer_name, lai.distance_km, lai.kt_freight,
+            `SELECT lai.id, lai.invoice_number, lai.to_place, lai.dealer_name, lai.kt_freight,
                     lai.quantity, lai.ifa_amount, la.invoice_date
              FROM loading_advance_invoices lai
              JOIN loading_advances la ON la.id = lai.loading_advance_id
@@ -111,8 +111,6 @@ const createLoadingAdvance = async (req, res, next) => {
             owner_name,
             owner_type,
             product_name,
-            cash_bank,
-            bank_id,
             invoice_date,
             invoices = [],
             driver_bata,
@@ -135,7 +133,6 @@ const createLoadingAdvance = async (req, res, next) => {
             owner_name,
             owner_type,
             product_name,
-            cash_bank,
             invoice_date,
             driver_bata,
             unloading,
@@ -161,13 +158,7 @@ const createLoadingAdvance = async (req, res, next) => {
         const parsedCityTax = Number(city_tax) || 0;
         const parsedMaintenance = Number(maintenance) || 0;
 
-        let bankSnapshot = { bank_id: null, bank_name: null, bank_branch: null, bank_ifsc: null, bank_account_no: null };
-        if (String(cash_bank).toLowerCase() === 'bank') {
-            const bankRes = await client.query('SELECT * FROM banks WHERE id = $1', [bank_id]);
-            if (bankRes.rows.length === 0) return res.status(400).json({ success: false, message: 'Invalid bank selection' });
-            const b = bankRes.rows[0];
-            bankSnapshot = { bank_id: b.id, bank_name: b.bank_name, bank_branch: b.branch, bank_ifsc: b.ifsc_code, bank_account_no: b.account_no };
-        }
+
         const pumpRes = await client.query('SELECT rate FROM pumps WHERE pump_name = $1', [pump_name]);
         if (pumpRes.rows.length === 0) return res.status(400).json({ success: false, message: 'Invalid pump selection' });
         const pumpRate = Number(pumpRes.rows[0].rate);
@@ -194,7 +185,7 @@ const createLoadingAdvance = async (req, res, next) => {
             const parsedQty = Number(quantity);
             const parsedKt = Number(kt_freight);
             const ifa_amount = Number.isFinite(parsedQty) && Number.isFinite(parsedKt) ? parsedQty * parsedKt : 0;
-            invoiceRows.push({ invoice_number, to_place, dealer_name, distance_km: place.distance_km, kt_freight: parsedKt || 0, quantity: parsedQty || 0, ifa_amount });
+            invoiceRows.push({ invoice_number, to_place, dealer_name, kt_freight: parsedKt || 0, quantity: parsedQty || 0, ifa_amount });
         }
 
         const sum_ifas = invoiceRows.reduce((s, r) => s + (Number(r.ifa_amount) || 0), 0);
@@ -210,8 +201,8 @@ const createLoadingAdvance = async (req, res, next) => {
         await client.query('BEGIN');
         const insertMain = `
             INSERT INTO loading_advances
-            (voucher_number, vehicle_registration_number, vehicle_type, vehicle_sub_type, vehicle_body_type, owner_name, owner_type, product_name, invoice_number, to_place, dealer_name, distance_km, kt_freight, quantity, ifa_amount, sum_ifas, driver_bata, unloading, tarpaulin, city_tax, maintenance, pump_name, fuel_litre, fuel_rate, fuel_amount, driver_name, driver_loading_advance, trip_balance, cash_bank, bank_id, bank_name, bank_branch, bank_ifsc, bank_account_no, commission_pct, gross_amount, predefined_expenses, invoice_date)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38)
+            (voucher_number, vehicle_registration_number, vehicle_type, vehicle_sub_type, vehicle_body_type, owner_name, owner_type, product_name, invoice_number, to_place, dealer_name, kt_freight, quantity, ifa_amount, sum_ifas, driver_bata, unloading, tarpaulin, city_tax, maintenance, pump_name, fuel_litre, fuel_rate, fuel_amount, driver_name, driver_loading_advance, trip_balance, commission_pct, predefined_expenses, invoice_date)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30)
             RETURNING *
         `;
         const mainVals = [
@@ -226,7 +217,6 @@ const createLoadingAdvance = async (req, res, next) => {
             firstInv.invoice_number,
             firstInv.to_place,
             firstInv.dealer_name,
-            firstInv.distance_km,
             firstInv.kt_freight,
             firstInv.quantity,
             firstInv.ifa_amount,
@@ -243,14 +233,7 @@ const createLoadingAdvance = async (req, res, next) => {
             isCommissioned ? null : driver_name,
             parsedDriverLoadingAdvance,
             trip_balance,
-            cash_bank,
-            bankSnapshot.bank_id,
-            bankSnapshot.bank_name,
-            bankSnapshot.bank_branch,
-            bankSnapshot.bank_ifsc,
-            bankSnapshot.bank_account_no,
             commission_pct,
-            gross_amount,
             predefined_expenses,
             invoice_date
         ];
@@ -259,8 +242,8 @@ const createLoadingAdvance = async (req, res, next) => {
 
         const invoiceInsert = `
             INSERT INTO loading_advance_invoices
-            (loading_advance_id, invoice_number, to_place, dealer_name, distance_km, kt_freight, quantity, ifa_amount)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+            (loading_advance_id, invoice_number, to_place, dealer_name, kt_freight, quantity, ifa_amount)
+            VALUES ($1,$2,$3,$4,$5,$6,$7)
         `;
         for (const inv of invoiceRows) {
             await client.query(invoiceInsert, [
@@ -268,7 +251,6 @@ const createLoadingAdvance = async (req, res, next) => {
                 inv.invoice_number,
                 inv.to_place,
                 inv.dealer_name,
-                inv.distance_km,
                 inv.kt_freight,
                 inv.quantity,
                 inv.ifa_amount

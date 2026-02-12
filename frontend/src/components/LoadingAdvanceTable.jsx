@@ -60,7 +60,6 @@ const LoadingAdvanceTable = ({ refreshKey = 0 }) => {
                                     <TableHead>Driver</TableHead>
                                     <TableHead>Diesel Amt</TableHead>
                                     <TableHead>Advance</TableHead>
-                                    <TableHead>Total Amount</TableHead>
                                     <TableHead>Trip Balance</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
@@ -76,7 +75,6 @@ const LoadingAdvanceTable = ({ refreshKey = 0 }) => {
                                         <TableCell>{r.driver_name || '-'}</TableCell>
                                         <TableCell>₹{Number(r.fuel_amount || 0).toFixed(2)}</TableCell>
                                         <TableCell>₹{Number(r.driver_loading_advance || 0).toFixed(2)}</TableCell>
-                                        <TableCell>₹{Number(r.gross_amount || 0).toFixed(2)}</TableCell>
                                         <TableCell>₹{Number(r.trip_balance || 0).toFixed(2)}</TableCell>
                                         <TableCell className="text-right"><Button size="sm" variant="outline">View</Button></TableCell>
                                     </TableRow>

@@ -58,7 +58,6 @@ CREATE TABLE IF NOT EXISTS loading_advances (
     invoice_number VARCHAR(50) NOT NULL,
     to_place VARCHAR(255) NOT NULL,
     dealer_name VARCHAR(255) NOT NULL,
-    distance_km DECIMAL(10, 2) NOT NULL,
     kt_freight DECIMAL(10, 2) NOT NULL,
     quantity DECIMAL(10, 3) NOT NULL,
     ifa_amount DECIMAL(12, 2) NOT NULL,
@@ -75,14 +74,7 @@ CREATE TABLE IF NOT EXISTS loading_advances (
     driver_name VARCHAR(255),
     driver_loading_advance DECIMAL(12, 2) NOT NULL,
     trip_balance DECIMAL(12, 2) NOT NULL,
-    cash_bank VARCHAR(10) NOT NULL,
-    bank_id INTEGER,
-    bank_name VARCHAR(255),
-    bank_branch VARCHAR(255),
-    bank_ifsc VARCHAR(30),
-    bank_account_no VARCHAR(30),
     commission_pct DECIMAL(5, 2) NOT NULL,
-    gross_amount DECIMAL(12, 2) NOT NULL,
     predefined_expenses DECIMAL(12, 2) NOT NULL,
     voucher_datetime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
     invoice_date DATE NOT NULL,
@@ -93,7 +85,7 @@ CREATE TABLE IF NOT EXISTS loading_advances (
 ALTER TABLE IF EXISTS loading_advances ADD COLUMN IF NOT EXISTS invoice_number VARCHAR(50);
 ALTER TABLE IF EXISTS loading_advances ADD COLUMN IF NOT EXISTS to_place VARCHAR(255);
 ALTER TABLE IF EXISTS loading_advances ADD COLUMN IF NOT EXISTS dealer_name VARCHAR(255);
-ALTER TABLE IF EXISTS loading_advances ADD COLUMN IF NOT EXISTS distance_km DECIMAL(10, 2);
+
 ALTER TABLE IF EXISTS loading_advances ADD COLUMN IF NOT EXISTS kt_freight DECIMAL(10, 2);
 ALTER TABLE IF EXISTS loading_advances ADD COLUMN IF NOT EXISTS quantity DECIMAL(10, 3);
 ALTER TABLE IF EXISTS loading_advances ADD COLUMN IF NOT EXISTS ifa_amount DECIMAL(12, 2);
@@ -110,14 +102,7 @@ ALTER TABLE IF EXISTS loading_advances ADD COLUMN IF NOT EXISTS fuel_amount DECI
 ALTER TABLE IF EXISTS loading_advances ADD COLUMN IF NOT EXISTS driver_name VARCHAR(255);
 ALTER TABLE IF EXISTS loading_advances ADD COLUMN IF NOT EXISTS driver_loading_advance DECIMAL(12, 2);
 ALTER TABLE IF EXISTS loading_advances ADD COLUMN IF NOT EXISTS trip_balance DECIMAL(12, 2);
-ALTER TABLE IF EXISTS loading_advances ADD COLUMN IF NOT EXISTS cash_bank VARCHAR(10);
-ALTER TABLE IF EXISTS loading_advances ADD COLUMN IF NOT EXISTS bank_id INTEGER;
-ALTER TABLE IF EXISTS loading_advances ADD COLUMN IF NOT EXISTS bank_name VARCHAR(255);
-ALTER TABLE IF EXISTS loading_advances ADD COLUMN IF NOT EXISTS bank_branch VARCHAR(255);
-ALTER TABLE IF EXISTS loading_advances ADD COLUMN IF NOT EXISTS bank_ifsc VARCHAR(30);
-ALTER TABLE IF EXISTS loading_advances ADD COLUMN IF NOT EXISTS bank_account_no VARCHAR(30);
 ALTER TABLE IF EXISTS loading_advances ADD COLUMN IF NOT EXISTS commission_pct DECIMAL(5, 2);
-ALTER TABLE IF EXISTS loading_advances ADD COLUMN IF NOT EXISTS gross_amount DECIMAL(12, 2);
 ALTER TABLE IF EXISTS loading_advances ADD COLUMN IF NOT EXISTS predefined_expenses DECIMAL(12, 2);
 
 -- Loading Advance Invoice Details (Multiple invoices per voucher)
@@ -127,7 +112,6 @@ CREATE TABLE IF NOT EXISTS loading_advance_invoices (
     invoice_number VARCHAR(50) NOT NULL,
     to_place VARCHAR(255) NOT NULL,
     dealer_name VARCHAR(255) NOT NULL,
-    distance_km DECIMAL(10, 2) NOT NULL,
     kt_freight DECIMAL(10, 2) NOT NULL,
     quantity DECIMAL(10, 3) NOT NULL,
     ifa_amount DECIMAL(12, 2) NOT NULL,
