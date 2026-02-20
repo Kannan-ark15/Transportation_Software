@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import LoadingAdvanceTable from './LoadingAdvanceTable';
 import { Loader2 } from 'lucide-react';
 const emptyInvoice = { invoice_number: '', place_id: '', to_place: '', dealer_name: '', kt_freight: '', quantity: '' };
-const emptyForm = { vehicle_registration_number: '', vehicle_type: '', vehicle_sub_type: '', vehicle_body_type: '', owner_name: '', owner_type: '', product_name: '', invoice_date: '', invoices: [emptyInvoice], driver_bata: '', unloading: '', tarpaulin: '', city_tax: '', maintenance: '', pump_name: '', fuel_litre: '', fuel_rate: '', driver_name: '', driver_loading_advance: '' };
+const emptyForm = { vehicle_registration_number: '', vehicle_type: '', vehicle_sub_type: '', vehicle_body_type: '', owner_name: '', owner_type: '', product_name: '', invoice_date: '', invoices: [emptyInvoice], driver_bata: '', unloading: '', tarpaulin: '', city_tax: '', maintenance: '', pump_name: '', fuel_litre: '', fuel_rate: '', driver_name: '', driver_loading_advance: '', tds: '' };
 const LoadingAdvance = () => {
     const [vehicles, setVehicles] = useState([]), [products, setProducts] = useState([]), [places, setPlaces] = useState([]), [dealers, setDealers] = useState([]), [pumps, setPumps] = useState([]), [drivers, setDrivers] = useState([]), [form, setForm] = useState(emptyForm), [loading, setLoading] = useState(true), [submitting, setSubmitting] = useState(false), [error, setError] = useState(''), [success, setSuccess] = useState(''), [lastSaved, setLastSaved] = useState(null), [voucherDisplay, setVoucherDisplay] = useState('Loading...'), [now] = useState(() => new Date().toLocaleString()), [modalOpen, setModalOpen] = useState(false), [refreshKey, setRefreshKey] = useState(0);
     const loginPrefix = (() => { try { return JSON.parse(localStorage.getItem('auth_user') || '{}')?.login_prefix; } catch { return undefined; } })();
@@ -23,7 +23,8 @@ const LoadingAdvance = () => {
 
     const predefinedExpenses = (commissionAmt + unloading + tarpaulinVal + cityTax + maintenance).toFixed(2);
     const fuelAmountVal = (Number(form.fuel_litre) || 0) * (Number(form.fuel_rate) || 0), fuelAmount = fuelAmountVal.toFixed(2);
-    const tripBalance = ((Number(form.driver_loading_advance) || 0) - fuelAmountVal - grossAmountVal).toFixed(2);
+    const tdsAmount = Number(form.tds) || 0;
+    const tripBalance = (sumIfas - (commissionAmt + (Number(form.driver_loading_advance) || 0) + fuelAmountVal + tdsAmount)).toFixed(2);
     const placeOptions = (product) => product ? places.filter(p => p.product_name === product) : places;
     const dealerOptions = (placeId) => placeId ? dealers.filter(d => String(d.place_id) === String(placeId)) : [];
     const fetchNextVoucher = async () => { if (!loginPrefix) return setVoucherDisplay('Auto generated'); try { const res = await loadingAdvanceAPI.getNextVoucher(loginPrefix); setVoucherDisplay(res.success ? res.data.voucher_number : 'Auto generated'); } catch { setVoucherDisplay('Auto generated'); } };
@@ -102,6 +103,7 @@ const LoadingAdvance = () => {
                             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-1"><Label className="required">Driver Name</Label><Select value={form.driver_name} onValueChange={v => setForm(f => ({ ...f, driver_name: v }))} disabled={isCommissioned}><SelectTrigger><SelectValue placeholder="Select driver" /></SelectTrigger><SelectContent>{drivers.map(d => <SelectItem key={d.id} value={d.driver_name}>{d.driver_name}</SelectItem>)}</SelectContent></Select></div>
                                 <div className="space-y-1"><Label className="required">Driver Loading Advance</Label><Input type="number" step="0.01" value={form.driver_loading_advance} onChange={e => setForm(f => ({ ...f, driver_loading_advance: e.target.value }))} /></div>
+                                <div className="space-y-1"><Label>TDS (Tax Deducted at Source)</Label><Input type="number" step="0.01" value={form.tds} onChange={e => setForm(f => ({ ...f, tds: e.target.value }))} /></div>
                                 <div className="space-y-1"><Label>Trip Balance</Label><Input disabled value={tripBalance} /></div>
                             </CardContent>
                         </Card>

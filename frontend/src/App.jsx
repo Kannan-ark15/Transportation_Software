@@ -15,6 +15,7 @@ import BankList from './components/BankList';
 import RateCardList from './components/RateCardList';
 import TemplatesPage from './components/TemplatesPage';
 import LoadingAdvance from './components/LoadingAdvance';
+import LoadingAdvanceDetail from './components/LoadingAdvanceDetail';
 import Acknowledgement from './components/Acknowledgement';
 
 function App() {
@@ -51,6 +52,7 @@ function App() {
                         <Route path="/masters/banks" element={<BankList />} />
                         <Route path="/masters/rate-cards" element={<RateCardList />} />
                         <Route path="/transactions/loading-advance" element={<LoadingAdvance />} />
+                        <Route path="/transactions/loading-advance/:id" element={<LoadingAdvanceDetail />} />
                         <Route path="/transactions/acknowledgement" element={<Acknowledgement />} />
                         <Route path="/templates" element={<TemplatesPage />} />
                     </Route>

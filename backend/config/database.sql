@@ -166,3 +166,6 @@ CREATE TRIGGER update_acknowledgements_updated_at
     BEFORE UPDATE ON acknowledgements
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+-- Add TDS column to loading_advances table if it doesn't exist
+ALTER TABLE IF EXISTS loading_advances ADD COLUMN IF NOT EXISTS tds DECIMAL(10, 2) DEFAULT 0 NOT NULL;

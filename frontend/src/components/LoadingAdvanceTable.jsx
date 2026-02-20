@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { loadingAdvanceAPI } from '../services/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -8,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, SearchX } from 'lucide-react';
 
 const LoadingAdvanceTable = ({ refreshKey = 0 }) => {
+    const navigate = useNavigate();
     const [rows, setRows] = useState([]), [loading, setLoading] = useState(true);
     const [voucherNo, setVoucherNo] = useState(''), [vehicleNo, setVehicleNo] = useState(''), [fromDate, setFromDate] = useState(''), [toDate, setToDate] = useState('');
     useEffect(() => {
@@ -76,7 +78,7 @@ const LoadingAdvanceTable = ({ refreshKey = 0 }) => {
                                         <TableCell>₹{Number(r.fuel_amount || 0).toFixed(2)}</TableCell>
                                         <TableCell>₹{Number(r.driver_loading_advance || 0).toFixed(2)}</TableCell>
                                         <TableCell>₹{Number(r.trip_balance || 0).toFixed(2)}</TableCell>
-                                        <TableCell className="text-right"><Button size="sm" variant="outline">View</Button></TableCell>
+                                        <TableCell className="text-right"><Button size="sm" variant="outline" onClick={() => navigate(`/transactions/loading-advance/${r.id}`)}>View</Button></TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>

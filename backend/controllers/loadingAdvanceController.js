@@ -83,6 +83,17 @@ const getAllLoadingAdvances = async (req, res, next) => {
     } catch (error) { next(error); }
 };
 
+const getLoadingAdvanceById = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query('SELECT * FROM loading_advances WHERE id = $1', [id]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, message: 'Loading advance not found' });
+        }
+        res.status(200).json({ success: true, data: result.rows[0] });
+    } catch (error) { next(error); }
+};
+
 const getLoadingAdvanceInvoices = async (req, res, next) => {
     try {
         const { id } = req.params;
@@ -122,7 +133,8 @@ const createLoadingAdvance = async (req, res, next) => {
             fuel_litre,
             fuel_rate,
             driver_name,
-            driver_loading_advance
+            driver_loading_advance,
+            tds = 0
         } = req.body;
 
         const required = {
@@ -194,15 +206,16 @@ const createLoadingAdvance = async (req, res, next) => {
         const predefined_expenses = commission_amount + parsedUnloading + parsedTarpaulin + parsedCityTax + parsedMaintenance;
         const gross_amount = isCommissioned ? (commission_amount - expenseSum) : (sum_ifas - expenseSum);
         const parsedDriverLoadingAdvance = Number(driver_loading_advance) || 0;
-        const trip_balance = parsedDriverLoadingAdvance - fuel_amount - gross_amount;
+        const parsedTds = Number(tds) || 0;
+        const trip_balance = sum_ifas - (commission_amount + parsedDriverLoadingAdvance + (parsedFuelLitre * parsedFuelRate) + parsedTds);
 
         const voucher_number = await buildVoucherNumber(login_prefix);
         const firstInv = invoiceRows[0];
         await client.query('BEGIN');
         const insertMain = `
             INSERT INTO loading_advances
-            (voucher_number, vehicle_registration_number, vehicle_type, vehicle_sub_type, vehicle_body_type, owner_name, owner_type, product_name, invoice_number, to_place, dealer_name, kt_freight, quantity, ifa_amount, sum_ifas, driver_bata, unloading, tarpaulin, city_tax, maintenance, pump_name, fuel_litre, fuel_rate, fuel_amount, driver_name, driver_loading_advance, trip_balance, commission_pct, predefined_expenses, invoice_date)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30)
+            (voucher_number, vehicle_registration_number, vehicle_type, vehicle_sub_type, vehicle_body_type, owner_name, owner_type, product_name, invoice_number, to_place, dealer_name, kt_freight, quantity, ifa_amount, sum_ifas, driver_bata, unloading, tarpaulin, city_tax, maintenance, pump_name, fuel_litre, fuel_rate, fuel_amount, driver_name, driver_loading_advance, trip_balance, commission_pct, predefined_expenses, invoice_date, tds)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31)
             RETURNING *
         `;
         const mainVals = [
@@ -235,7 +248,8 @@ const createLoadingAdvance = async (req, res, next) => {
             trip_balance,
             commission_pct,
             predefined_expenses,
-            invoice_date
+            invoice_date,
+            parsedTds
         ];
         const result = await client.query(insertMain, mainVals);
         const loadingAdvanceId = result.rows[0].id;
@@ -267,4 +281,4 @@ const createLoadingAdvance = async (req, res, next) => {
     }
 };
 
-module.exports = { getAllLoadingAdvances, createLoadingAdvance, getNextVoucher, getLoadingAdvanceInvoices };
+module.exports = { getAllLoadingAdvances, getLoadingAdvanceById, createLoadingAdvance, getNextVoucher, getLoadingAdvanceInvoices };
