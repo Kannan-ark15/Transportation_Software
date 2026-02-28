@@ -10,13 +10,16 @@ CREATE TABLE IF NOT EXISTS companies (
     company_address_1 TEXT NOT NULL,
     company_address_2 TEXT,
     place VARCHAR(255) NOT NULL,
-    gst_no VARCHAR(15) NOT NULL UNIQUE,
+    gst_no VARCHAR(15) NOT NULL,
     pin_code VARCHAR(6) NOT NULL,
     contact_no VARCHAR(15) NOT NULL UNIQUE,
     email_id VARCHAR(255) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- GST number can repeat across masters
+ALTER TABLE IF EXISTS companies DROP CONSTRAINT IF EXISTS companies_gst_no_key;
 
 -- Create indexes for better query performance
 CREATE INDEX IF NOT EXISTS idx_companies_company_name ON companies(company_name);

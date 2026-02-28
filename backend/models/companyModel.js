@@ -117,20 +117,6 @@ class CompanyModel {
         return result.rows.length > 0;
     }
 
-    // Check if GST number exists (for uniqueness validation)
-    static async existsByGST(gst_no, excludeId = null) {
-        let query = 'SELECT id FROM companies WHERE gst_no = $1';
-        const values = [gst_no];
-
-        if (excludeId) {
-            query += ' AND id != $2';
-            values.push(excludeId);
-        }
-
-        const result = await pool.query(query, values);
-        return result.rows.length > 0;
-    }
-
     // Check if contact number exists (for uniqueness validation)
     static async existsByContact(contact_no, excludeId = null) {
         let query = 'SELECT id FROM companies WHERE contact_no = $1';

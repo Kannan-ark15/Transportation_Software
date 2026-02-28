@@ -15,14 +15,6 @@ class CompanyController {
                 });
             }
 
-            const gstExists = await CompanyModel.existsByGST(companyData.gst_no);
-            if (gstExists) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'GST number already exists'
-                });
-            }
-
             const contactExists = await CompanyModel.existsByContact(companyData.contact_no);
             if (contactExists) {
                 return res.status(400).json({
@@ -117,14 +109,6 @@ class CompanyController {
                 return res.status(400).json({
                     success: false,
                     message: 'Company name already exists'
-                });
-            }
-
-            const gstExists = await CompanyModel.existsByGST(companyData.gst_no, id);
-            if (gstExists) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'GST number already exists'
                 });
             }
 

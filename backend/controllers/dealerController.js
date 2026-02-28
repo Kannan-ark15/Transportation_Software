@@ -4,10 +4,6 @@ class DealerController {
     static async createDealer(req, res) {
         try {
             const dealerData = req.body;
-            const exists = await DealerModel.existsByGST(dealerData.gst_no);
-            if (exists) {
-                return res.status(400).json({ success: false, message: 'GST number already exists' });
-            }
             const newDealer = await DealerModel.create(dealerData);
             res.status(201).json({ success: true, message: 'Dealer created successfully', data: newDealer });
         } catch (error) {
@@ -42,10 +38,6 @@ class DealerController {
         try {
             const { id } = req.params;
             const dealerData = req.body;
-            const exists = await DealerModel.existsByGST(dealerData.gst_no, id);
-            if (exists) {
-                return res.status(400).json({ success: false, message: 'GST number already exists' });
-            }
             const updatedDealer = await DealerModel.update(id, dealerData);
             res.status(200).json({ success: true, message: 'Dealer updated successfully', data: updatedDealer });
         } catch (error) {

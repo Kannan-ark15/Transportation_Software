@@ -94,13 +94,47 @@ ALTER TABLE IF EXISTS login_users
 ALTER TABLE IF EXISTS vehicles DROP COLUMN IF EXISTS rc_expiry_date;
 ALTER TABLE IF EXISTS vehicles DROP COLUMN IF EXISTS rc_document;
 
+-- Vehicle Master: Technical and Compliance sections are optional
+DO $$
+DECLARE
+    optional_col TEXT;
+BEGIN
+    FOREACH optional_col IN ARRAY ARRAY[
+        'engine_no',
+        'chasis_no',
+        'pollution_no',
+        'pollution_expiry_date',
+        'permit_no',
+        'permit_from_date',
+        'permit_till_date',
+        'fc_no',
+        'fc_from_date',
+        'fc_till_date'
+    ]
+    LOOP
+        IF EXISTS (
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+                AND table_name = 'vehicles'
+                AND column_name = optional_col
+        ) THEN
+            EXECUTE format('ALTER TABLE vehicles ALTER COLUMN %I DROP NOT NULL', optional_col);
+        END IF;
+    END LOOP;
+END;
+$$;
+
+-- GST number can repeat across masters
+ALTER TABLE IF EXISTS companies DROP CONSTRAINT IF EXISTS companies_gst_no_key;
+
 -- 5. DEALER MASTER
 CREATE TABLE IF NOT EXISTS dealers (
     id SERIAL PRIMARY KEY,
     place_id INTEGER REFERENCES places(id) ON DELETE CASCADE,
     district VARCHAR(100) NOT NULL,
     dealer_name VARCHAR(255) NOT NULL,
-    gst_no VARCHAR(20) UNIQUE NOT NULL,
+    gst_no VARCHAR(20) NOT NULL,
     contact_no_1 VARCHAR(15) NOT NULL,
     contact_no_2 VARCHAR(15),
     sales_area VARCHAR(255) NOT NULL,
@@ -108,6 +142,7 @@ CREATE TABLE IF NOT EXISTS dealers (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+ALTER TABLE IF EXISTS dealers DROP CONSTRAINT IF EXISTS dealers_gst_no_key;
 
 -- Trigger for updated_at (Generic function already exists but let's ensure it's there)
 CREATE OR REPLACE FUNCTION update_updated_at_column()

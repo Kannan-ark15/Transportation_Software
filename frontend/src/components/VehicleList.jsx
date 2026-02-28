@@ -211,10 +211,10 @@ const VehicleList = () => {
                     fc_from_date: parseDate(row['FC From']) || parseDate(row['fc_from_date']),
                     fc_till_date: parseDate(row['FC Till']) || parseDate(row['fc_till_date']),
 
-                    // Mandatory Document Numbers & Values (Strict Mode Support)
-                    pollution_no: row['Pollution No'] || row['pollution_no'] || 'NA',
-                    permit_no: row['Permit No'] || row['permit_no'] || 'NA',
-                    fc_no: row['FC No'] || row['fc_no'] || 'NA',
+                    // Document numbers (Compliance is optional)
+                    pollution_no: row['Pollution No'] || row['pollution_no'] || '',
+                    permit_no: row['Permit No'] || row['permit_no'] || '',
+                    fc_no: row['FC No'] || row['fc_no'] || '',
                     insurance_no: row['Insurance No'] || row['insurance_no'] || 'NA',
                     insurance_base_value: row['Insurance Base Value'] || row['insurance_base_value'] || 0,
                     insurance_amount: row['Insurance Amount'] || row['insurance_amount'] || 0,
@@ -300,10 +300,7 @@ const VehicleList = () => {
         const mandatoryFields = [
             'vehicle_no', 'vehicle_type', 'vehicle_sub_type', 'vehicle_body_type',
             'brand_name', 'own_dedicated', 'owner_name', 'recommended_km',
-            'pollution_no', 'pollution_expiry_date',
-            'permit_no', 'permit_from_date', 'permit_till_date',
-            'insurance_no', 'insurance_base_value', 'fc_no',
-            'fc_from_date', 'fc_till_date'
+            'insurance_no', 'insurance_base_value'
         ];
 
         mandatoryFields.forEach(field => {
@@ -610,7 +607,7 @@ const VehicleList = () => {
                         {/* Section: Technical Details */}
                         <div className="space-y-4">
                             <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                                <Settings className="w-4 h-4" /> Technical Details
+                                <Settings className="w-4 h-4" /> Technical Details (Optional)
                             </h4>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
                                 <div className="space-y-2">
@@ -629,7 +626,7 @@ const VehicleList = () => {
                         {/* Section: Statutory Documents */}
                         <div className="space-y-4">
                             <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                                <FileText className="w-4 h-4" /> Compliance Documents
+                                <FileText className="w-4 h-4" /> Compliance Documents (Optional)
                             </h4>
 
                             {/* Pollution */}
@@ -637,11 +634,11 @@ const VehicleList = () => {
                                 <p className="text-xs font-bold text-slate-600">Pollution Details</p>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div className="space-y-1">
-                                        <Label className="text-[10px] required">Document Number</Label>
+                                        <Label className="text-[10px]">Document Number</Label>
                                         <Input className="h-8 text-sm" value={formData.pollution_no} onChange={e => setFormData({ ...formData, pollution_no: e.target.value })} />
                                     </div>
                                     <div className="space-y-1">
-                                        <Label className="text-[10px] required">Expiry Date</Label>
+                                        <Label className="text-[10px]">Expiry Date</Label>
                                         <Input type="date" className="h-8 text-sm" value={formData.pollution_expiry_date} onChange={e => setFormData({ ...formData, pollution_expiry_date: e.target.value })} />
                                     </div>
                                     <div className="space-y-1">
@@ -658,15 +655,15 @@ const VehicleList = () => {
                                 <p className="text-xs font-bold text-slate-600">Permit Details</p>
                                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                     <div className="space-y-1">
-                                        <Label className="text-[10px] required">Number</Label>
+                                        <Label className="text-[10px]">Number</Label>
                                         <Input className="h-8 text-sm" value={formData.permit_no} onChange={e => setFormData({ ...formData, permit_no: e.target.value })} />
                                     </div>
                                     <div className="space-y-1">
-                                        <Label className="text-[10px] required">Validity From</Label>
+                                        <Label className="text-[10px]">Validity From</Label>
                                         <Input type="date" className="h-8 text-sm" value={formData.permit_from_date} onChange={e => setFormData({ ...formData, permit_from_date: e.target.value })} />
                                     </div>
                                     <div className="space-y-1">
-                                        <Label className="text-[10px] required">Validity Till</Label>
+                                        <Label className="text-[10px]">Validity Till</Label>
                                         <Input type="date" className="h-8 text-sm" value={formData.permit_till_date} onChange={e => setFormData({ ...formData, permit_till_date: e.target.value })} />
                                     </div>
                                     <div className="space-y-1">
@@ -683,15 +680,15 @@ const VehicleList = () => {
                                 <p className="text-xs font-bold text-slate-600">Fitness (FC) Details</p>
                                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                     <div className="space-y-1">
-                                        <Label className="text-[10px] required">Number</Label>
+                                        <Label className="text-[10px]">Number</Label>
                                         <Input className="h-8 text-sm" value={formData.fc_no} onChange={e => setFormData({ ...formData, fc_no: e.target.value })} />
                                     </div>
                                     <div className="space-y-1">
-                                        <Label className="text-[10px] required">Validity From</Label>
+                                        <Label className="text-[10px]">Validity From</Label>
                                         <Input type="date" className="h-8 text-sm" value={formData.fc_from_date} onChange={e => setFormData({ ...formData, fc_from_date: e.target.value })} />
                                     </div>
                                     <div className="space-y-1">
-                                        <Label className="text-[10px] required">Validity Till</Label>
+                                        <Label className="text-[10px]">Validity Till</Label>
                                         <Input type="date" className="h-8 text-sm" value={formData.fc_till_date} onChange={e => setFormData({ ...formData, fc_till_date: e.target.value })} />
                                     </div>
                                     <div className="space-y-1">

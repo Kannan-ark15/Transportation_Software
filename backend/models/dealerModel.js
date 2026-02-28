@@ -76,16 +76,6 @@ class DealerModel {
         return result.rows[0];
     }
 
-    static async existsByGST(gst_no, excludeId = null) {
-        let query = 'SELECT id FROM dealers WHERE gst_no = $1';
-        const values = [gst_no];
-        if (excludeId) {
-            query += ' AND id != $2';
-            values.push(excludeId);
-        }
-        const result = await pool.query(query, values);
-        return result.rows.length > 0;
-    }
 }
 
 module.exports = DealerModel;
