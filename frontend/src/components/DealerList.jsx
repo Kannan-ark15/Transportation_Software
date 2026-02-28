@@ -104,7 +104,7 @@ const DealerList = () => {
                     gst_no: row['GST No'] || row['gst_no'],
                     contact_no_1: row['Contact 1'] || row['contact_no_1'],
                     contact_no_2: row['Contact 2'] || row['contact_no_2'] || '',
-                    sales_area: row['Sales Area'] || row['sales_area'],
+                    sales_area: row['Sales Area'] || row['sales_area'] || place.to_place || '',
                     sales_officer_no: row['Sales Officer No'] || row['sales_officer_no']
                 };
 
@@ -162,7 +162,8 @@ const DealerList = () => {
         setFormData({
             ...formData,
             place_id: placeId,
-            district: place ? place.district : ''
+            district: place ? place.district : '',
+            sales_area: place ? (place.to_place || '') : ''
         });
     };
 
