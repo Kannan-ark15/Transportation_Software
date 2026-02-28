@@ -59,6 +59,11 @@ const toNumber = (value, fallback = 0) => {
     return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const hasLoanRepaymentTrackingTable = async (client) => {
+    const result = await client.query(`SELECT to_regclass('public.loan_repayment_trackings') AS table_name`);
+    return Boolean(result.rows[0]?.table_name);
+};
+
 const normalizeSchedule = (loanAmount, schedules = []) => {
     let runningOutstanding = Number(toNumber(loanAmount, 0).toFixed(2));
     let totalDue = 0;
@@ -241,6 +246,7 @@ const createLoanMaster = async (req, res, next) => {
         if (vehicleRes.rows.length === 0) return res.status(400).json({ success: false, message: 'Selected vehicle is not eligible for loan master' });
 
         const { normalized, totalDue } = normalizeSchedule(parsedLoanAmount, schedules);
+        const trackingTableExists = await hasLoanRepaymentTrackingTable(client);
 
         await client.query('BEGIN');
         inTx = true;
@@ -271,10 +277,22 @@ const createLoanMaster = async (req, res, next) => {
         const loanMaster = masterRes.rows[0];
         const insertScheduleSql = `INSERT INTO loan_master_schedules
             (loan_master_id, installment_number, due_date, principal, interest, due_amount, outstanding_principal)
-            VALUES ($1,$2,$3,$4,$5,$6,$7)`;
+            VALUES ($1,$2,$3,$4,$5,$6,$7)
+            RETURNING id`;
+        const insertTrackingSql = `INSERT INTO loan_repayment_trackings
+            (loan_master_id, loan_master_schedule_id, installment_number, due_date, principal, interest, due_amount, outstanding_principal, due_settled)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,FALSE)
+            ON CONFLICT (loan_master_schedule_id) DO UPDATE
+            SET installment_number = EXCLUDED.installment_number,
+                due_date = EXCLUDED.due_date,
+                principal = EXCLUDED.principal,
+                interest = EXCLUDED.interest,
+                due_amount = EXCLUDED.due_amount,
+                outstanding_principal = EXCLUDED.outstanding_principal,
+                updated_at = CURRENT_TIMESTAMP`;
 
         for (const row of normalized) {
-            await client.query(insertScheduleSql, [
+            const scheduleRes = await client.query(insertScheduleSql, [
                 loanMaster.id,
                 row.installment_number,
                 row.due_date,
@@ -283,6 +301,19 @@ const createLoanMaster = async (req, res, next) => {
                 row.due_amount,
                 row.outstanding_principal
             ]);
+
+            if (trackingTableExists) {
+                await client.query(insertTrackingSql, [
+                    loanMaster.id,
+                    scheduleRes.rows[0].id,
+                    row.installment_number,
+                    row.due_date,
+                    row.principal,
+                    row.interest,
+                    row.due_amount,
+                    row.outstanding_principal
+                ]);
+            }
         }
 
         await client.query('COMMIT');
@@ -357,6 +388,7 @@ const updateLoanMaster = async (req, res, next) => {
         if (vehicleRes.rows.length === 0) return res.status(400).json({ success: false, message: 'Selected vehicle is not eligible for loan master' });
 
         const { normalized, totalDue } = normalizeSchedule(parsedLoanAmount, schedules);
+        const trackingTableExists = await hasLoanRepaymentTrackingTable(client);
 
         await client.query('BEGIN');
         inTx = true;
@@ -397,13 +429,28 @@ const updateLoanMaster = async (req, res, next) => {
             ]
         );
 
+        if (trackingTableExists) {
+            await client.query('DELETE FROM loan_repayment_trackings WHERE loan_master_id = $1', [id]);
+        }
         await client.query('DELETE FROM loan_master_schedules WHERE loan_master_id = $1', [id]);
 
         const insertScheduleSql = `INSERT INTO loan_master_schedules
             (loan_master_id, installment_number, due_date, principal, interest, due_amount, outstanding_principal)
-            VALUES ($1,$2,$3,$4,$5,$6,$7)`;
+            VALUES ($1,$2,$3,$4,$5,$6,$7)
+            RETURNING id`;
+        const insertTrackingSql = `INSERT INTO loan_repayment_trackings
+            (loan_master_id, loan_master_schedule_id, installment_number, due_date, principal, interest, due_amount, outstanding_principal, due_settled)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,FALSE)
+            ON CONFLICT (loan_master_schedule_id) DO UPDATE
+            SET installment_number = EXCLUDED.installment_number,
+                due_date = EXCLUDED.due_date,
+                principal = EXCLUDED.principal,
+                interest = EXCLUDED.interest,
+                due_amount = EXCLUDED.due_amount,
+                outstanding_principal = EXCLUDED.outstanding_principal,
+                updated_at = CURRENT_TIMESTAMP`;
         for (const row of normalized) {
-            await client.query(insertScheduleSql, [
+            const scheduleRes = await client.query(insertScheduleSql, [
                 id,
                 row.installment_number,
                 row.due_date,
@@ -412,6 +459,19 @@ const updateLoanMaster = async (req, res, next) => {
                 row.due_amount,
                 row.outstanding_principal
             ]);
+
+            if (trackingTableExists) {
+                await client.query(insertTrackingSql, [
+                    id,
+                    scheduleRes.rows[0].id,
+                    row.installment_number,
+                    row.due_date,
+                    row.principal,
+                    row.interest,
+                    row.due_amount,
+                    row.outstanding_principal
+                ]);
+            }
         }
 
         await client.query('COMMIT');
@@ -443,4 +503,3 @@ module.exports = {
     updateLoanMaster,
     deleteLoanMaster
 };
-

@@ -142,7 +142,8 @@ const Sidebar = () => {
             icon: <Landmark className="w-5 h-5" />,
             hasSubmenu: true,
             submenu: [
-                { label: 'Loan Master', path: '/advances-loans/loan-master' }
+                { label: 'Loan Master', path: '/advances-loans/loan-master' },
+                { label: 'Loan Repayment', path: '/advances-loans/loan-repayment' }
             ]
         },
         {

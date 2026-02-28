@@ -88,6 +88,22 @@ export const loanMasterAPI = {
     }
 };
 
+export const loanRepaymentAPI = {
+    ...generateCRUD('/loan-repayments'),
+    getMeta: async () => {
+        const response = await api.get('/loan-repayments/meta');
+        return response.data;
+    },
+    getByVehicle: async (vehicleId) => {
+        const response = await api.get(`/loan-repayments/vehicle/${vehicleId}`);
+        return response.data;
+    },
+    updateStatus: async (id, data) => {
+        const response = await api.put(`/loan-repayments/${id}/status`, data);
+        return response.data;
+    }
+};
+
 export const authAPI = {
     register: async (data) => {
         const response = await api.post('/auth/register', data);

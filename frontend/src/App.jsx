@@ -21,6 +21,7 @@ import DedicatedMarketSettlement from './components/DedicatedMarketSettlement';
 import OwnVehicleSettlement from './components/OwnVehicleSettlement';
 import BalanceSettlement from './components/BalanceSettlement';
 import LoanMaster from './components/LoanMaster';
+import LoanRepayment from './components/LoanRepayment';
 
 function App() {
     const isAuthenticated = () => Boolean(localStorage.getItem('auth_user'));
@@ -62,6 +63,7 @@ function App() {
                         <Route path="/transactions/dedicated-market-settlement" element={<DedicatedMarketSettlement />} />
                         <Route path="/transactions/own-vehicle-settlement" element={<OwnVehicleSettlement />} />
                         <Route path="/advances-loans/loan-master" element={<LoanMaster />} />
+                        <Route path="/advances-loans/loan-repayment" element={<LoanRepayment />} />
                         <Route path="/templates" element={<TemplatesPage />} />
                     </Route>
                     <Route path="*" element={<Navigate to="/" replace />} />
