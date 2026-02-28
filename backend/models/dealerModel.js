@@ -17,8 +17,8 @@ class DealerModel {
         `;
 
         const values = [
-            place_id, district, dealer_name, gst_no, contact_no_1,
-            contact_no_2 || null, sales_area, sales_officer_no
+            place_id, district, dealer_name, gst_no || null, contact_no_1 || null,
+            contact_no_2 || null, sales_area, sales_officer_no || null
         ];
 
         const result = await pool.query(query, values);
@@ -62,8 +62,8 @@ class DealerModel {
         `;
 
         const values = [
-            place_id, district, dealer_name, gst_no, contact_no_1,
-            contact_no_2 || null, sales_area, sales_officer_no, id
+            place_id, district, dealer_name, gst_no || null, contact_no_1 || null,
+            contact_no_2 || null, sales_area, sales_officer_no || null, id
         ];
 
         const result = await pool.query(query, values);

@@ -78,6 +78,7 @@ const VehicleList = () => {
         brand_name: '',
         own_dedicated: 'Own',
         owner_name: '',
+        vehicle_financial_status: 'Free',
         recommended_km: '',
         engine_no: '',
         chasis_no: '',
@@ -98,6 +99,10 @@ const VehicleList = () => {
         fc_from_date: '',
         fc_till_date: '',
         fc_document: null,
+        bank_name: '',
+        branch: '',
+        account_number: '',
+        ifsc_code: '',
         status: 'Active'
     });
 
@@ -197,6 +202,7 @@ const VehicleList = () => {
                     brand_name: row['Brand'] || row['brand_name'],
                     own_dedicated: row['Category'] || row['own_dedicated'] || 'Own',
                     owner_name: row['Owner'] || row['owner_name'],
+                    vehicle_financial_status: row['Vehicle Financial Status'] || row['vehicle_financial_status'] || 'Free',
 
                     // Technical Details
                     recommended_km: row['Recommended KM'] || row['recommended_km'] || 0,
@@ -219,6 +225,10 @@ const VehicleList = () => {
                     insurance_base_value: row['Insurance Base Value'] || row['insurance_base_value'] || 0,
                     insurance_amount: row['Insurance Amount'] || row['insurance_amount'] || 0,
                     gst_percent: row['GST %'] || row['gst_percent'] || 0,
+                    bank_name: row['Bank Name'] || row['bank_name'] || '',
+                    branch: row['Branch'] || row['branch'] || '',
+                    account_number: row['Account Number'] || row['account_number'] || row['Account No'] || '',
+                    ifsc_code: row['IFSC'] || row['ifsc_code'] || '',
 
                     status: 'Active'
                 };
@@ -249,6 +259,7 @@ const VehicleList = () => {
         { header: 'Vehicle No', dataKey: 'vehicle_no' },
         { header: 'Type', dataKey: 'vehicle_type' },
         { header: 'Sub Type', dataKey: 'vehicle_sub_type' },
+        { header: 'Financial Status', dataKey: 'vehicle_financial_status' },
         { header: 'Owner', dataKey: 'owner_name' },
         { header: 'Status', dataKey: 'status' },
     ];
@@ -259,8 +270,14 @@ const VehicleList = () => {
         setSelectedVehicle(vehicle);
         setFormErrors({});
         if (vehicle) {
-            setFormData({ ...vehicle });
-        } else {
+            const normalizedVehicle = {
+                ...vehicle,
+                vehicle_financial_status: vehicle.vehicle_financial_status || 'Free',
+                bank_name: vehicle.bank_name || '',
+                branch: vehicle.branch || '',
+                account_number: vehicle.account_number || '',
+                ifsc_code: vehicle.ifsc_code || ''
+            };
             setFormData({
                 vehicle_no: '',
                 vehicle_type: '',
@@ -269,6 +286,7 @@ const VehicleList = () => {
                 brand_name: '',
                 own_dedicated: 'Own',
                 owner_name: '',
+                vehicle_financial_status: 'Free',
                 recommended_km: '',
                 engine_no: '',
                 chasis_no: '',
@@ -289,6 +307,47 @@ const VehicleList = () => {
                 fc_from_date: '',
                 fc_till_date: '',
                 fc_document: null,
+                bank_name: '',
+                branch: '',
+                account_number: '',
+                ifsc_code: '',
+                status: 'Active',
+                ...normalizedVehicle
+            });
+        } else {
+            setFormData({
+                vehicle_no: '',
+                vehicle_type: '',
+                vehicle_sub_type: '',
+                vehicle_body_type: '',
+                brand_name: '',
+                own_dedicated: 'Own',
+                owner_name: '',
+                vehicle_financial_status: 'Free',
+                recommended_km: '',
+                engine_no: '',
+                chasis_no: '',
+                pollution_no: '',
+                pollution_expiry_date: '',
+                pollution_document: null,
+                permit_no: '',
+                permit_from_date: '',
+                permit_till_date: '',
+                permit_document: null,
+                insurance_no: '',
+                insurance_base_value: '',
+                gst_percent: '',
+                gst_value: 0,
+                insurance_amount: 0,
+                insurance_document: null,
+                fc_no: '',
+                fc_from_date: '',
+                fc_till_date: '',
+                fc_document: null,
+                bank_name: '',
+                branch: '',
+                account_number: '',
+                ifsc_code: '',
                 status: 'Active'
             });
         }
@@ -439,6 +498,7 @@ const VehicleList = () => {
                                                 <TableCell>
                                                     <div className="text-sm font-medium text-slate-900">{v.vehicle_type} - {v.vehicle_sub_type}</div>
                                                     <div className="text-xs text-slate-500">{v.own_dedicated}: {v.owner_name}</div>
+                                                    <div className="text-xs text-slate-400">Financial: {v.vehicle_financial_status || 'Free'}</div>
                                                 </TableCell>
                                                 <TableCell>
                                                     <Badge className={cn(
@@ -600,6 +660,22 @@ const VehicleList = () => {
                                     {formErrors.owner_name && <p className="text-[10px] text-red-500">{formErrors.owner_name}</p>}
                                 </div>
                             </div>
+
+                            <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
+                                <div className="space-y-1">
+                                    <Label className="text-sm font-semibold text-slate-800">Vehicle Financial Status</Label>
+                                    <p className="text-xs text-slate-500">Switch between free vehicle and loan vehicle.</p>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <span className={cn("text-sm font-bold", formData.vehicle_financial_status === 'Loan' ? "text-amber-600" : "text-emerald-600")}>
+                                        {formData.vehicle_financial_status === 'Loan' ? 'LOAN' : 'FREE'}
+                                    </span>
+                                    <Switch
+                                        checked={formData.vehicle_financial_status === 'Loan'}
+                                        onCheckedChange={checked => setFormData({ ...formData, vehicle_financial_status: checked ? 'Loan' : 'Free' })}
+                                    />
+                                </div>
+                            </div>
                         </div>
 
                         <Separator />
@@ -734,6 +810,35 @@ const VehicleList = () => {
                                 <Button type="button" variant="outline" size="sm" className="flex items-center gap-2">
                                     <Upload className="w-3 h-3" /> Upload Policy Document
                                 </Button>
+                            </div>
+                        </div>
+
+                        <Separator />
+
+                        {/* Section: Bank Details */}
+                        <div className="space-y-4">
+                            <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                                <ClipboardList className="w-4 h-4" /> Bank Details (Optional)
+                            </h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="bank_name">Bank Name</Label>
+                                    <Input id="bank_name" value={formData.bank_name || ''} onChange={e => setFormData({ ...formData, bank_name: e.target.value })} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="branch">Branch</Label>
+                                    <Input id="branch" value={formData.branch || ''} onChange={e => setFormData({ ...formData, branch: e.target.value })} />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="account_number">Account Number</Label>
+                                    <Input id="account_number" value={formData.account_number || ''} onChange={e => setFormData({ ...formData, account_number: e.target.value })} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="ifsc_code">IFSC Code</Label>
+                                    <Input id="ifsc_code" value={formData.ifsc_code || ''} onChange={e => setFormData({ ...formData, ifsc_code: e.target.value.toUpperCase() })} className="font-mono uppercase" />
+                                </div>
                             </div>
                         </div>
 

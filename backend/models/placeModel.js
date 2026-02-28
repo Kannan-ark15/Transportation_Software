@@ -2,17 +2,25 @@ const pool = require('../config/database');
 
 class PlaceModel {
     static normalizeRateCard(rateCard = {}) {
+        const hasValue = (value) => value !== '' && value !== null && value !== undefined;
         const toNumber = (value) => {
-            if (value === '' || value === null || value === undefined) return 0;
+            if (!hasValue(value)) return 0;
             const parsed = Number(value);
             return Number.isFinite(parsed) ? parsed : 0;
         };
+        const toNumberOrNull = (value) => {
+            if (!hasValue(value)) return null;
+            const parsed = Number(value);
+            return Number.isFinite(parsed) ? parsed : null;
+        };
 
-        const hasRcl = rateCard.rcl_freight !== '' && rateCard.rcl_freight !== null && rateCard.rcl_freight !== undefined;
+        const hasRcl = hasValue(rateCard.rcl_freight);
         const rclFreight = hasRcl ? toNumber(rateCard.rcl_freight) : 0;
-        const ktFreight = rateCard.kt_freight !== undefined && rateCard.kt_freight !== ''
+        const ktFreight = hasValue(rateCard.kt_freight)
             ? toNumber(rateCard.kt_freight)
             : (hasRcl && Number.isFinite(rclFreight) ? Math.floor(rclFreight) - 1 : 0);
+        const isOpenContainer = String(rateCard.vehicle_body_type || '').trim().toLowerCase() === 'open container';
+        const tarpaulin = isOpenContainer ? (toNumberOrNull(rateCard.tarpaulin) ?? 0) : null;
 
         return {
             vehicle_type: rateCard.vehicle_type || null,
@@ -23,7 +31,7 @@ class PlaceModel {
             driver_bata: toNumber(rateCard.driver_bata),
             advance: toNumber(rateCard.advance),
             unloading: toNumber(rateCard.unloading),
-            tarpaulin: toNumber(rateCard.tarpaulin),
+            tarpaulin,
             city_tax: toNumber(rateCard.city_tax),
             maintenance: toNumber(rateCard.maintenance)
         };

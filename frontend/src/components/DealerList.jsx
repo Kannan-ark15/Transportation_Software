@@ -108,7 +108,7 @@ const DealerList = () => {
                     sales_officer_no: row['Sales Officer No'] || row['sales_officer_no']
                 };
 
-                if (!mappedData.dealer_name || !mappedData.gst_no) continue;
+                if (!mappedData.dealer_name) continue;
 
                 try {
                     await dealerAPI.create(mappedData);
@@ -145,11 +145,11 @@ const DealerList = () => {
                 place_id: dealer.place_id.toString(),
                 district: dealer.district,
                 dealer_name: dealer.dealer_name,
-                gst_no: dealer.gst_no,
-                contact_no_1: dealer.contact_no_1,
+                gst_no: dealer.gst_no || '',
+                contact_no_1: dealer.contact_no_1 || '',
                 contact_no_2: dealer.contact_no_2 || '',
                 sales_area: dealer.sales_area,
-                sales_officer_no: dealer.sales_officer_no
+                sales_officer_no: dealer.sales_officer_no || ''
             });
         } else {
             setFormData({ place_id: '', district: '', dealer_name: '', gst_no: '', contact_no_1: '', contact_no_2: '', sales_area: '', sales_officer_no: '' });
@@ -284,7 +284,7 @@ const DealerList = () => {
                                                     <div className="font-semibold text-slate-900">{d.dealer_name}</div>
                                                     <div className="flex items-center gap-1 text-[10px] text-slate-400 font-mono mt-0.5">
                                                         <Hash className="w-2.5 h-2.5" />
-                                                        {d.gst_no}
+                                                        {d.gst_no || '-'}
                                                     </div>
                                                 </TableCell>
                                                 <TableCell>
@@ -296,7 +296,7 @@ const DealerList = () => {
                                                 <TableCell>
                                                     <div className="flex items-center gap-1.5 text-slate-600 text-sm">
                                                         <Phone className="w-3.5 h-3.5 text-slate-400" />
-                                                        {d.contact_no_1}
+                                                        {d.contact_no_1 || '-'}
                                                     </div>
                                                 </TableCell>
                                                 <TableCell>
@@ -412,7 +412,7 @@ const DealerList = () => {
 
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label htmlFor="gst_no" className="required">GST Number</Label>
+                                <Label htmlFor="gst_no">GST Number</Label>
                                 <Input
                                     id="gst_no"
                                     value={formData.gst_no}
@@ -420,7 +420,6 @@ const DealerList = () => {
                                     onChange={e => setFormData({ ...formData, gst_no: e.target.value })}
                                     placeholder="22AAAAA0000A1Z5"
                                     className="font-mono uppercase"
-                                    required
                                 />
                             </div>
                             <div className="space-y-2">
@@ -440,7 +439,7 @@ const DealerList = () => {
 
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label htmlFor="contact1" className="required flex items-center gap-2">
+                                <Label htmlFor="contact1" className="flex items-center gap-2">
                                     <Phone className="w-3 h-3 text-slate-400" /> Mobile Number
                                 </Label>
                                 <Input
@@ -450,7 +449,6 @@ const DealerList = () => {
                                     onChange={e => setFormData({ ...formData, contact_no_1: e.target.value })}
                                     placeholder="Primary"
                                     maxLength={10}
-                                    required
                                 />
                             </div>
                             <div className="space-y-2 text-slate-500">
@@ -467,7 +465,7 @@ const DealerList = () => {
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="officer_no" className="required flex items-center gap-2">
+                            <Label htmlFor="officer_no" className="flex items-center gap-2">
                                 <ShieldCheck className="w-3 h-3 text-slate-400" /> Sales Officer Contact
                             </Label>
                             <Input
@@ -476,7 +474,6 @@ const DealerList = () => {
                                 disabled={modalMode === 'view'}
                                 onChange={e => setFormData({ ...formData, sales_officer_no: e.target.value })}
                                 placeholder="Verification officer number"
-                                required
                             />
                         </div>
 

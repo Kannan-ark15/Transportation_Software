@@ -20,8 +20,8 @@ class PumpModel {
 
         const values = [
             pump_name, rate, contact_person, contact_no || null, email_id,
-            company_address_1, company_address_2 || null, place, pan_no, gst_no,
-            bank_name, branch, account_number, ifsc_code
+            company_address_1, company_address_2 || null, place, pan_no, gst_no || null,
+            bank_name || null, branch || null, account_number || null, ifsc_code || null
         ];
 
         const result = await pool.query(query, values);
@@ -60,7 +60,7 @@ class PumpModel {
         const values = [
             rate, contact_person, contact_no || null, email_id,
             company_address_1, company_address_2 || null, place,
-            bank_name, branch, account_number, ifsc_code, id
+            bank_name || null, branch || null, account_number || null, ifsc_code || null, id
         ];
 
         const result = await pool.query(query, values);

@@ -269,13 +269,15 @@ const PlaceList = () => {
     const handleRateTypeChange = (index, value) => {
         const selected = rateTypeOptions.find(option => option.value === value);
         if (!selected) return;
+        const isOpenContainer = String(selected.vehicle_body_type || '').toLowerCase() === 'open container';
         setRateChartRows(prev => prev.map((row, i) => (
             i === index
                 ? {
                     ...row,
                     vehicle_type: selected.vehicle_type,
                     vehicle_sub_type: selected.vehicle_sub_type,
-                    vehicle_body_type: selected.vehicle_body_type
+                    vehicle_body_type: selected.vehicle_body_type,
+                    tarpaulin: isOpenContainer ? row.tarpaulin : ''
                 }
                 : row
         )));
@@ -284,6 +286,10 @@ const PlaceList = () => {
     const handleRateRowChange = (index, field, value) => {
         setRateChartRows(prev => prev.map((row, i) => {
             if (i !== index) return row;
+            if (field === 'tarpaulin') {
+                const isOpenContainer = String(row.vehicle_body_type || '').toLowerCase() === 'open container';
+                if (!isOpenContainer) return { ...row, tarpaulin: '' };
+            }
             const updated = { ...row, [field]: value };
             if (field === 'rcl_freight') {
                 const parsed = parseFloat(value);
@@ -319,9 +325,11 @@ const PlaceList = () => {
                 const kt = row.kt_freight !== '' && row.kt_freight !== null && row.kt_freight !== undefined
                     ? row.kt_freight
                     : (Number.isFinite(rcl) ? Math.floor(rcl) - 1 : '');
+                const isOpenContainer = String(row.vehicle_body_type || '').toLowerCase() === 'open container';
                 return {
                     ...row,
-                    kt_freight: kt
+                    kt_freight: kt,
+                    tarpaulin: isOpenContainer ? row.tarpaulin : null
                 };
             });
 
@@ -737,14 +745,19 @@ const PlaceList = () => {
                                                             />
                                                         </td>
                                                         <td className="px-3 py-2">
+                                                            {(() => {
+                                                                const isOpenContainer = String(row.vehicle_body_type || '').toLowerCase() === 'open container';
+                                                                return (
                                                             <Input
                                                                 type="number"
                                                                 value={row.tarpaulin}
-                                                                disabled={modalMode === 'view'}
+                                                                disabled={modalMode === 'view' || !isOpenContainer}
                                                                 onChange={(e) => handleRateRowChange(index, 'tarpaulin', e.target.value)}
                                                                 className="h-9 text-xs"
-                                                                placeholder="Enter tarpaulin"
+                                                                placeholder={isOpenContainer ? "Enter tarpaulin" : "Not applicable"}
                                                             />
+                                                                );
+                                                            })()}
                                                         </td>
                                                         <td className="px-3 py-2">
                                                             <Input
