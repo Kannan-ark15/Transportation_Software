@@ -311,7 +311,7 @@ const BankList = () => {
                                                 </TableCell>
                                                 <TableCell className="text-right">
                                                     <div className="flex justify-end gap-1">
-                                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-blue-600 hover:bg-blue-50">
+                                                        <Button variant="ghost" size="icon" onClick={() => handleOpenModal('view', b)} className="h-8 w-8 text-slate-500 hover:text-blue-600 hover:bg-blue-50">
                                                             <Eye className="h-4 w-4" />
                                                         </Button>
                                                         <Button variant="ghost" size="icon" onClick={() => handleOpenModal('edit', b)} className="h-8 w-8 text-slate-500 hover:text-amber-600 hover:bg-amber-50">
@@ -345,12 +345,13 @@ const BankList = () => {
                 <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2 text-xl font-bold">
-                            {modalMode === 'add' ? <Plus className="w-5 h-5 text-blue-600" /> : <Edit className="w-5 h-5 text-amber-600" />}
-                            {modalMode === 'add' ? 'Add Bank Account' : 'Edit Bank Account'}
+                            {modalMode === 'add' ? <Plus className="w-5 h-5 text-blue-600" /> : modalMode === 'edit' ? <Edit className="w-5 h-5 text-amber-600" /> : <Eye className="w-5 h-5 text-blue-600" />}
+                            {modalMode === 'add' ? 'Add Bank Account' : modalMode === 'edit' ? 'Edit Bank Account' : 'Bank Account Details'}
                         </DialogTitle>
                     </DialogHeader>
 
                     <form onSubmit={handleSubmit} className="space-y-6 py-4 px-1">
+                        <fieldset disabled={modalMode === 'view'} className="space-y-6">
                         <div className="space-y-4">
                             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
                                 <Landmark className="w-3 h-3" /> Bank & Branch Details
@@ -471,22 +472,25 @@ const BankList = () => {
                                 />
                             </div>
                         </div>
+                        </fieldset>
 
                         <DialogFooter className="pt-6 border-t border-slate-100 flex items-center justify-end gap-3">
                             <Button type="button" variant="outline" onClick={() => setModalOpen(false)} disabled={submitting}>
-                                Cancel
+                                {modalMode === 'view' ? 'Close' : 'Cancel'}
                             </Button>
-                            <Button
-                                type="submit"
-                                disabled={submitting}
-                                className={cn(
-                                    "min-w-[150px] shadow-lg",
-                                    modalMode === 'edit' ? "bg-amber-600 hover:bg-amber-700 shadow-amber-200" : "bg-blue-600 hover:bg-blue-700 shadow-blue-200"
-                                )}
-                            >
-                                {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                                {modalMode === 'add' ? 'Add Account' : 'Save Changes'}
-                            </Button>
+                            {modalMode !== 'view' && (
+                                <Button
+                                    type="submit"
+                                    disabled={submitting}
+                                    className={cn(
+                                        "min-w-[150px] shadow-lg",
+                                        modalMode === 'edit' ? "bg-amber-600 hover:bg-amber-700 shadow-amber-200" : "bg-blue-600 hover:bg-blue-700 shadow-blue-200"
+                                    )}
+                                >
+                                    {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                                    {modalMode === 'add' ? 'Add Account' : 'Save Changes'}
+                                </Button>
+                            )}
                         </DialogFooter>
                     </form>
                 </DialogContent>
