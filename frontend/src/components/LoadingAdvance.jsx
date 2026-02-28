@@ -10,6 +10,17 @@ import LoadingAdvanceTable from './LoadingAdvanceTable';
 import { Loader2 } from 'lucide-react';
 const emptyInvoice = { invoice_number: '', place_id: '', to_place: '', dealer_name: '', kt_freight: '', quantity: '' };
 const emptyForm = { vehicle_registration_number: '', vehicle_type: '', vehicle_sub_type: '', vehicle_body_type: '', owner_name: '', owner_type: '', product_name: '', invoice_date: '', invoices: [emptyInvoice], driver_bata: '', unloading: '', tarpaulin: '', city_tax: '', maintenance: '', pump_name: '', fuel_litre: '', fuel_rate: '', driver_name: '', driver_loading_advance: '', tds: '' };
+const getLastEditedDriverName = (drivers = []) => {
+    if (!Array.isArray(drivers) || drivers.length === 0) return '';
+    const sorted = [...drivers].sort((a, b) => {
+        const aRaw = new Date(a.updated_at || a.created_at || 0).getTime();
+        const bRaw = new Date(b.updated_at || b.created_at || 0).getTime();
+        const aTs = Number.isFinite(aRaw) ? aRaw : 0;
+        const bTs = Number.isFinite(bRaw) ? bRaw : 0;
+        return bTs - aTs;
+    });
+    return sorted[0]?.driver_name || '';
+};
 const LoadingAdvance = () => {
     const [vehicles, setVehicles] = useState([]), [products, setProducts] = useState([]), [places, setPlaces] = useState([]), [dealers, setDealers] = useState([]), [pumps, setPumps] = useState([]), [drivers, setDrivers] = useState([]), [form, setForm] = useState(emptyForm), [loading, setLoading] = useState(true), [submitting, setSubmitting] = useState(false), [error, setError] = useState(''), [success, setSuccess] = useState(''), [lastSaved, setLastSaved] = useState(null), [voucherDisplay, setVoucherDisplay] = useState('Loading...'), [now] = useState(() => new Date().toLocaleString()), [modalOpen, setModalOpen] = useState(false), [refreshKey, setRefreshKey] = useState(0);
     const loginPrefix = (() => { try { return JSON.parse(localStorage.getItem('auth_user') || '{}')?.login_prefix; } catch { return undefined; } })();
@@ -25,11 +36,44 @@ const LoadingAdvance = () => {
     const fuelAmountVal = (Number(form.fuel_litre) || 0) * (Number(form.fuel_rate) || 0), fuelAmount = fuelAmountVal.toFixed(2);
     const tdsAmount = Number(form.tds) || 0;
     const tripBalance = (sumIfas - (commissionAmt + (Number(form.driver_loading_advance) || 0) + fuelAmountVal + tdsAmount)).toFixed(2);
+    const defaultDriverName = getLastEditedDriverName(drivers);
     const placeOptions = (product) => product ? places.filter(p => p.product_name === product) : places;
     const dealerOptions = (placeId) => placeId ? dealers.filter(d => String(d.place_id) === String(placeId)) : [];
     const fetchNextVoucher = async () => { if (!loginPrefix) return setVoucherDisplay('Auto generated'); try { const res = await loadingAdvanceAPI.getNextVoucher(loginPrefix); setVoucherDisplay(res.success ? res.data.voucher_number : 'Auto generated'); } catch { setVoucherDisplay('Auto generated'); } };
-    useEffect(() => { const load = async () => { try { setLoading(true); const [vRes, pRes, plRes, dRes, puRes, drRes] = await Promise.all([vehicleAPI.getAll(), productAPI.getAll(), placeAPI.getAll(), dealerAPI.getAll(), pumpAPI.getAll(), driverAPI.getAll()]); if (vRes.success) setVehicles(vRes.data); if (pRes.success) setProducts(pRes.data); if (plRes.success) setPlaces(plRes.data); if (dRes.success) setDealers(dRes.data); if (puRes.success) setPumps(puRes.data); if (drRes.success) setDrivers(drRes.data); } catch { setError('Failed to load masters'); } finally { setLoading(false); } }; load(); fetchNextVoucher(); }, []);
-    const onVehicleChange = (vehicleNo) => { const v = vehicles.find(x => x.vehicle_no === vehicleNo); if (!v) return; const ot = v.own_dedicated || v.owner_type || ''; const otLower = String(ot).toLowerCase(); setForm(f => ({ ...f, vehicle_registration_number: vehicleNo, vehicle_type: v.vehicle_type || '', vehicle_sub_type: v.vehicle_sub_type || '', vehicle_body_type: v.vehicle_body_type || '', owner_name: v.owner_name || '', owner_type: ot, driver_name: (otLower === 'dedicated' || otLower === 'market') ? '' : f.driver_name })); };
+    useEffect(() => {
+        const load = async () => {
+            try {
+                setLoading(true);
+                const [vRes, pRes, plRes, dRes, puRes, drRes] = await Promise.all([
+                    vehicleAPI.getAll(),
+                    productAPI.getAll(),
+                    placeAPI.getAll(),
+                    dealerAPI.getAll(),
+                    pumpAPI.getAll(),
+                    driverAPI.getAll()
+                ]);
+                if (vRes.success) setVehicles(vRes.data);
+                if (pRes.success) setProducts(pRes.data);
+                if (plRes.success) setPlaces(plRes.data);
+                if (dRes.success) setDealers(dRes.data);
+                if (puRes.success) setPumps(puRes.data);
+                if (drRes.success) {
+                    setDrivers(drRes.data);
+                    const lastEditedDriver = getLastEditedDriverName(drRes.data);
+                    if (lastEditedDriver) {
+                        setForm((f) => ({ ...f, driver_name: f.driver_name || lastEditedDriver }));
+                    }
+                }
+            } catch {
+                setError('Failed to load masters');
+            } finally {
+                setLoading(false);
+            }
+        };
+        load();
+        fetchNextVoucher();
+    }, []);
+    const onVehicleChange = (vehicleNo) => { const v = vehicles.find(x => x.vehicle_no === vehicleNo); if (!v) return; const ot = v.own_dedicated || v.owner_type || ''; const otLower = String(ot).toLowerCase(); setForm(f => ({ ...f, vehicle_registration_number: vehicleNo, vehicle_type: v.vehicle_type || '', vehicle_sub_type: v.vehicle_sub_type || '', vehicle_body_type: v.vehicle_body_type || '', owner_name: v.owner_name || '', owner_type: ot, driver_name: (otLower === 'dedicated' || otLower === 'market') ? '' : (f.driver_name || defaultDriverName) })); };
     const updateInvoice = (idx, patch) => setForm(f => ({ ...f, invoices: f.invoices.map((inv, i) => i === idx ? { ...inv, ...patch } : inv) }));
     const addInvoice = () => setForm(f => ({ ...f, invoices: [...f.invoices, emptyInvoice] }));
     const removeInvoice = (idx) => setForm(f => ({ ...f, invoices: f.invoices.filter((_, i) => i !== idx) }));
@@ -37,7 +81,7 @@ const LoadingAdvance = () => {
     const onPlaceChange = async (idx, placeId) => { const place = places.find(p => String(p.id) === String(placeId)); updateInvoice(idx, { place_id: placeId, to_place: place?.to_place || '', dealer_name: '' }); try { const res = await placeAPI.getById(placeId); const cards = res.success ? (res.data.rate_cards || []) : []; const vt = form.vehicle_type, vst = form.vehicle_sub_type, vbt = form.vehicle_body_type; const match = cards.find(rc => rc.vehicle_type === vt && rc.vehicle_sub_type === vst && rc.vehicle_body_type === vbt) || cards[0]; if (match) { updateInvoice(idx, { kt_freight: match.kt_freight ?? '' }); setForm(f => ({ ...f, driver_bata: match.driver_bata ?? f.driver_bata, unloading: match.unloading ?? f.unloading, tarpaulin: String(vbt || '').toLowerCase().includes('container') ? 0 : (match.tarpaulin ?? f.tarpaulin), city_tax: match.city_tax ?? f.city_tax, maintenance: match.maintenance ?? f.maintenance, driver_loading_advance: f.driver_loading_advance || match.advance || '' })); } } catch { } };
 
     const onPumpChange = (val) => { const p = pumps.find(x => x.pump_name === val); setForm(f => ({ ...f, pump_name: val, fuel_rate: p?.rate ?? f.fuel_rate })); };
-    const handleSubmit = async (e) => { e.preventDefault(); setError(''); setSuccess(''); if (!form.vehicle_registration_number || !form.product_name || !form.invoice_date || !form.driver_bata || !form.unloading || !form.pump_name || !form.fuel_litre || !form.fuel_rate || !form.driver_loading_advance) return setError('Please fill all mandatory fields'); if (!isCommissioned && !form.driver_name) return setError('Driver name is required'); if (form.invoices.some(i => !i.invoice_number || !i.to_place || !i.dealer_name || !i.quantity || !i.kt_freight)) return setError('Please fill all invoice fields'); try { setSubmitting(true); const invoices = form.invoices.map(i => ({ ...i, ifa_amount: (Number(i.quantity) || 0) * (Number(i.kt_freight) || 0) })); const res = await loadingAdvanceAPI.create({ ...form, invoices, commission_pct: commissionPct, login_prefix: loginPrefix }); if (res.success) { setSuccess(`Saved voucher ${res.data.voucher_number}`); setLastSaved(res.data); setForm(emptyForm); fetchNextVoucher(); setRefreshKey(k => k + 1); } } catch (err) { setError(err.response?.data?.message || 'Save failed'); } finally { setSubmitting(false); } };
+    const handleSubmit = async (e) => { e.preventDefault(); setError(''); setSuccess(''); if (!form.vehicle_registration_number || !form.product_name || !form.invoice_date || !form.driver_bata || !form.unloading || !form.pump_name || !form.fuel_litre || !form.fuel_rate || !form.driver_loading_advance) return setError('Please fill all mandatory fields'); if (!isCommissioned && !form.driver_name) return setError('Driver name is required'); if (form.invoices.some(i => !i.invoice_number || !i.to_place || !i.dealer_name || !i.quantity || !i.kt_freight)) return setError('Please fill all invoice fields'); try { setSubmitting(true); const invoices = form.invoices.map(i => ({ ...i, ifa_amount: (Number(i.quantity) || 0) * (Number(i.kt_freight) || 0) })); const res = await loadingAdvanceAPI.create({ ...form, invoices, commission_pct: commissionPct, login_prefix: loginPrefix }); if (res.success) { setSuccess(`Saved voucher ${res.data.voucher_number}`); setLastSaved(res.data); setForm({ ...emptyForm, driver_name: defaultDriverName }); fetchNextVoucher(); setRefreshKey(k => k + 1); } } catch (err) { setError(err.response?.data?.message || 'Save failed'); } finally { setSubmitting(false); } };
     if (loading) return (<div className="flex flex-col items-center justify-center min-h-[300px] text-slate-500"><Loader2 className="h-10 w-10 animate-spin text-blue-600 mb-3" /><p className="text-base font-medium">Loading masters...</p></div>);
     return (
         <div className="space-y-6">
@@ -109,7 +153,7 @@ const LoadingAdvance = () => {
                                 <div className="space-y-1"><Label>Trip Balance</Label><Input disabled value={tripBalance} /></div>
                             </CardContent>
                         </Card>
-                        <div className="flex justify-end gap-2 pt-2"><Button type="button" variant="outline" onClick={() => { setForm(emptyForm); fetchNextVoucher(); }} disabled={submitting}>Clear</Button><Button type="submit" disabled={submitting}>{submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Save</Button></div>
+                        <div className="flex justify-end gap-2 pt-2"><Button type="button" variant="outline" onClick={() => { setForm({ ...emptyForm, driver_name: defaultDriverName }); fetchNextVoucher(); }} disabled={submitting}>Clear</Button><Button type="submit" disabled={submitting}>{submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Save</Button></div>
                     </form>
                     {lastSaved && <div className="text-xs text-slate-500">Last saved: {lastSaved.voucher_number} on {new Date(lastSaved.voucher_datetime).toLocaleString()}</div>}
                 </DialogContent>
