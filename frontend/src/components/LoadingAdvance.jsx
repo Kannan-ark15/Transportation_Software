@@ -82,6 +82,8 @@ const LoadingAdvance = () => {
                         <Card className="border border-slate-100 shadow-none"><CardHeader className="pb-2 bg-accent/10 border-b border-accent/20 rounded-t-lg"><CardTitle className="text-lg text-accent">Charges & Predefined Trip Expenses</CardTitle></CardHeader>
                             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-1"><Label>Sum of all IFAs</Label><Input disabled value={sumIfas.toFixed(2)} /></div>
+                                <div className="space-y-1"><Label>Commission %</Label><Input disabled value={commissionPct.toFixed(2)} /></div>
+                                <div className="space-y-1"><Label>Commission Amount</Label><Input disabled value={commissionAmt.toFixed(2)} /></div>
                                 <div className="space-y-1"><Label className="required">Driver Bata</Label><Input type="number" step="0.01" value={form.driver_bata} onChange={e => setForm(f => ({ ...f, driver_bata: e.target.value }))} /></div>
                                 <div className="space-y-1"><Label className="required">Unloading</Label><Input type="number" step="0.01" value={form.unloading} onChange={e => setForm(f => ({ ...f, unloading: e.target.value }))} /></div>
                                 <div className="space-y-1"><Label>Tarpaulin</Label><Input type="number" step="0.01" disabled={isContainer} value={isContainer ? 0 : form.tarpaulin} onChange={e => setForm(f => ({ ...f, tarpaulin: e.target.value }))} /></div>

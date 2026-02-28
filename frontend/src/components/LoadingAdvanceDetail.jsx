@@ -86,7 +86,9 @@ const LoadingAdvanceDetail = () => {
     const grossAmount = commissionPct > 0 ? (commissionAmt - expenseSum) : (sumIfas - expenseSum);
     const fuelAmount = Number(voucher.fuel_amount) || 0;
     const tdsAmount = Number(voucher.tds) || 0;
-    const tripBalance = sumIfas - (commissionAmt + (Number(voucher.driver_loading_advance) || 0) + fuelAmount + tdsAmount);
+    const calculatedTripBalance = sumIfas - (commissionAmt + (Number(voucher.driver_loading_advance) || 0) + fuelAmount + tdsAmount);
+    const savedTripBalance = Number(voucher.trip_balance);
+    const tripBalance = Number.isFinite(savedTripBalance) ? savedTripBalance : calculatedTripBalance;
 
     return (
         <div className="space-y-6 pb-6">
