@@ -34,7 +34,7 @@ const AcknowledgementTable = ({ refreshKey = 0 }) => {
             <CardContent className="pt-5 space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-1"><Label>Voucher No</Label><Input list="ack_voucher_list" value={voucher} onChange={e => setVoucher(e.target.value)} placeholder="Select voucher" /></div>
-                    <div className="space-y-1"><Label>Status</Label><Select value={status} onValueChange={setStatus}><SelectTrigger><SelectValue placeholder="All" /></SelectTrigger><SelectContent>{['All', 'Pending', 'Settled'].map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div>
+                    <div className="space-y-1"><Label>Status</Label><Select value={status} onValueChange={setStatus}><SelectTrigger><SelectValue placeholder="All" /></SelectTrigger><SelectContent>{['All', 'Pending', 'Ready for Settlement'].map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div>
                 </div>
                 <datalist id="ack_voucher_list">{rows.map(r => <option key={r.id} value={r.voucher_number} />)}</datalist>
                 {filtered.length === 0 ? (
@@ -49,6 +49,7 @@ const AcknowledgementTable = ({ refreshKey = 0 }) => {
                                     <TableHead>Vehicle No</TableHead>
                                     <TableHead>Voucher Status</TableHead>
                                     <TableHead>Pending Amount</TableHead>
+                                    <TableHead>Pending/Shortage Invoices</TableHead>
                                     <TableHead>Date</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -60,6 +61,7 @@ const AcknowledgementTable = ({ refreshKey = 0 }) => {
                                         <TableCell>{r.vehicle_registration_number || '-'}</TableCell>
                                         <TableCell>{r.voucher_status}</TableCell>
                                         <TableCell>{Number(r.voucher_pending_amount || 0).toFixed(2)}</TableCell>
+                                        <TableCell>{r.pending_shortage_invoice_numbers || '-'}</TableCell>
                                         <TableCell className="text-xs">{r.created_at ? new Date(r.created_at).toLocaleDateString() : '-'}</TableCell>
                                     </TableRow>
                                 ))}

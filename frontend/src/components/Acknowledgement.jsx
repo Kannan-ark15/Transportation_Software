@@ -20,10 +20,10 @@ const Acknowledgement = () => {
     const [modalOpen, setModalOpen] = useState(false), [submitting, setSubmitting] = useState(false), [error, setError] = useState(''), [success, setSuccess] = useState(''), [refreshKey, setRefreshKey] = useState(0);
 
     useEffect(() => { const load = async () => { try { setLoading(true); const res = await loadingAdvanceAPI.getAll(); if (res.success) setAdvances(res.data); } finally { setLoading(false); } }; load(); }, []);
+    const totalIfa = useMemo(() => invoices.reduce((s, i) => s + (Number(i.ifa_amount) || 0), 0), [invoices]);
     const totalReturned = useMemo(() => invoices.reduce((s, i) => s + (Number(i.returned_amount) || 0), 0), [invoices]);
-    const tripBalance = Number(voucherInfo?.trip_balance || 0);
-    const pendingAmount = (tripBalance - totalReturned);
-    const voucherStatus = invoices.length && invoices.every(i => i.status === 'Acknowledged') ? 'Settled' : 'Pending';
+    const pendingAmount = (totalIfa - totalReturned);
+    const voucherStatus = invoices.length && invoices.every(i => i.status === 'Acknowledged') ? 'Ready for Settlement' : 'Pending';
 
     const updateInvoice = (idx, patch) => setInvoices(list => list.map((inv, i) => i === idx ? { ...inv, ...patch } : inv));
     const setStatus = (idx, status) => {
@@ -55,7 +55,7 @@ const Acknowledgement = () => {
             setInvoices([]);
         }
     };
-    const validate = () => { if (!voucherInfo) return 'Please select a voucher'; if (!invoices.length) return 'No invoices found'; for (const inv of invoices) { const ifa = Number(inv.ifa_amount || 0); const ret = Number(inv.returned_amount || 0); if (inv.status === 'Acknowledged' && Math.abs(ret - ifa) > 0.01) return `Returned amount must equal IFA for ${inv.invoice_number}`; if (inv.status === 'Shortage' && !(ret > 0 && ret < ifa)) return `Returned amount must be less than IFA for ${inv.invoice_number}`; if (inv.status === 'Pending' && ret !== 0) return `Returned amount must be 0 for ${inv.invoice_number}`; } if (pendingAmount < 0) return 'Total returned exceeds trip balance'; return ''; };
+    const validate = () => { if (!voucherInfo) return 'Please select a voucher'; if (!invoices.length) return 'No invoices found'; for (const inv of invoices) { const ifa = Number(inv.ifa_amount || 0); const ret = Number(inv.returned_amount || 0); if (inv.status === 'Acknowledged' && Math.abs(ret - ifa) > 0.01) return `Returned amount must equal IFA for ${inv.invoice_number}`; if (inv.status === 'Shortage' && !(ret > 0 && ret < ifa)) return `Returned amount must be less than IFA for ${inv.invoice_number}`; if (inv.status === 'Pending' && ret !== 0) return `Returned amount must be 0 for ${inv.invoice_number}`; } if (pendingAmount < 0) return 'Total returned exceeds total IFA'; return ''; };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -150,12 +150,10 @@ const Acknowledgement = () => {
                         </Card>
                         <Card className="border border-slate-100 shadow-none"><CardHeader className="pb-2 bg-accent/10 border-b border-accent/20 rounded-t-lg"><CardTitle className="text-lg text-accent">Voucher Summary</CardTitle></CardHeader>
                             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-1"><Label>Trip Balance</Label><Input disabled value={tripBalance.toFixed(2)} /></div>
-                                <div className="space-y-1"><Label>Total Returned</Label><Input disabled value={totalReturned.toFixed(2)} /></div>
                                 <div className="space-y-1"><Label>Voucher Pending Amount</Label><Input disabled value={pendingAmount.toFixed(2)} /></div>
                                 <div className="space-y-1"><Label>Voucher Status</Label>
                                     <div className="flex items-center gap-3 text-xs pt-1">
-                                        {['Pending', 'Settled'].map(s => (<label key={s} className="flex items-center gap-1"><input type="radio" disabled checked={voucherStatus === s} readOnly />{s}</label>))}
+                                        {['Pending', 'Ready for Settlement'].map(s => (<label key={s} className="flex items-center gap-1"><input type="radio" disabled checked={voucherStatus === s} readOnly />{s}</label>))}
                                     </div>
                                 </div>
                             </CardContent>

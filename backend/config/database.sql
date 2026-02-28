@@ -141,7 +141,7 @@ CREATE TABLE IF NOT EXISTS acknowledgements (
     id SERIAL PRIMARY KEY,
     loading_advance_id INTEGER UNIQUE REFERENCES loading_advances(id) ON DELETE CASCADE,
     voucher_number VARCHAR(20) NOT NULL,
-    voucher_status VARCHAR(20) NOT NULL CHECK (voucher_status IN ('Pending', 'Settled')),
+    voucher_status VARCHAR(20) NOT NULL CHECK (voucher_status IN ('Pending', 'Ready for Settlement')),
     voucher_pending_amount DECIMAL(12, 2) NOT NULL DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -191,6 +191,15 @@ WHERE acknowledgement_date IS NULL;
 ALTER TABLE IF EXISTS acknowledgement_invoices ALTER COLUMN dealer_name SET NOT NULL;
 ALTER TABLE IF EXISTS acknowledgement_invoices ALTER COLUMN acknowledgement_number SET NOT NULL;
 ALTER TABLE IF EXISTS acknowledgement_invoices ALTER COLUMN acknowledgement_date SET NOT NULL;
+
+UPDATE acknowledgements
+SET voucher_status = 'Ready for Settlement'
+WHERE voucher_status = 'Settled';
+
+ALTER TABLE IF EXISTS acknowledgements DROP CONSTRAINT IF EXISTS acknowledgements_voucher_status_check;
+ALTER TABLE IF EXISTS acknowledgements
+    ADD CONSTRAINT acknowledgements_voucher_status_check
+    CHECK (voucher_status IN ('Pending', 'Ready for Settlement'));
 
 CREATE TRIGGER update_acknowledgements_updated_at
     BEFORE UPDATE ON acknowledgements

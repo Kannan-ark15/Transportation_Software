@@ -9,7 +9,16 @@ const getAllAcknowledgements = async (req, res, next) => {
     try {
         const result = await pool.query(
             `SELECT a.id, a.loading_advance_id, a.voucher_number, a.voucher_status, a.voucher_pending_amount, a.created_at,
-                    la.vehicle_registration_number, la.voucher_datetime
+                    la.vehicle_registration_number, la.voucher_datetime,
+                    COALESCE(
+                        (
+                            SELECT string_agg(ai.invoice_number, ', ' ORDER BY ai.invoice_number)
+                            FROM acknowledgement_invoices ai
+                            WHERE ai.acknowledgement_id = a.id
+                                AND ai.status IN ('Pending', 'Shortage')
+                        ),
+                        ''
+                    ) AS pending_shortage_invoice_numbers
              FROM acknowledgements a
              JOIN loading_advances la ON la.id = a.loading_advance_id
              ORDER BY a.created_at DESC`
@@ -26,7 +35,7 @@ const createAcknowledgement = async (req, res, next) => {
         if (!loading_advance_id) return res.status(400).json({ success: false, message: 'loading_advance_id is required' });
         if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ success: false, message: 'At least one invoice is required' });
 
-        const laRes = await client.query('SELECT id, voucher_number, trip_balance FROM loading_advances WHERE id = $1', [loading_advance_id]);
+        const laRes = await client.query('SELECT id, voucher_number FROM loading_advances WHERE id = $1', [loading_advance_id]);
         if (laRes.rows.length === 0) return res.status(400).json({ success: false, message: 'Invalid voucher selection' });
         const exists = await client.query('SELECT 1 FROM acknowledgements WHERE loading_advance_id = $1', [loading_advance_id]);
         if (exists.rows.length) return res.status(400).json({ success: false, message: 'Acknowledgement already exists for this voucher' });
@@ -63,11 +72,11 @@ const createAcknowledgement = async (req, res, next) => {
         }
         if (seen.size !== invMap.size) return res.status(400).json({ success: false, message: 'All invoices must be acknowledged' });
 
-        const tripBalance = Number(laRes.rows[0].trip_balance || 0);
+        const totalIfa = rows.reduce((s, r) => s + (Number(r.ifa_amount) || 0), 0);
         const totalReturned = rows.reduce((s, r) => s + (Number(r.returned_amount) || 0), 0);
-        const voucher_pending_amount = tripBalance - totalReturned;
-        if (voucher_pending_amount < 0) return res.status(400).json({ success: false, message: 'Total returned exceeds trip balance' });
-        const voucher_status = rows.every(r => r.status === 'Acknowledged') ? 'Settled' : 'Pending';
+        const voucher_pending_amount = totalIfa - totalReturned;
+        if (voucher_pending_amount < 0) return res.status(400).json({ success: false, message: 'Total returned exceeds total IFA' });
+        const voucher_status = rows.every(r => r.status === 'Acknowledged') ? 'Ready for Settlement' : 'Pending';
 
         await client.query('BEGIN');
         inTx = true;
