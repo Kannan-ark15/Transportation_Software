@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
     LayoutDashboard,
@@ -26,6 +26,7 @@ import {
     SidebarGroup,
     SidebarGroupLabel,
     SidebarGroupContent,
+    useSidebar,
 } from "@/components/ui/sidebar";
 import {
     Collapsible,
@@ -44,9 +45,41 @@ import {
 const Sidebar = () => {
     const navigate = useNavigate();
     const location = useLocation();
+    const { isMobile, state, setOpen, setOpenMobile } = useSidebar();
+    const hoverExpandedRef = useRef(false);
     const authUser = (() => { try { return JSON.parse(localStorage.getItem('auth_user') || '{}'); } catch { return {}; } })();
     const displayName = authUser.full_name || authUser.email || 'Admin User';
     const initials = displayName.split(' ').filter(Boolean).slice(0, 2).map(s => s[0].toUpperCase()).join('') || 'A';
+
+    const closeSidebarAfterNavigation = useCallback(() => {
+        if (isMobile) {
+            setOpenMobile(false);
+            return;
+        }
+        setOpen(false);
+    }, [isMobile, setOpen, setOpenMobile]);
+
+    const navigateAndCloseSidebar = useCallback((path, options = {}) => {
+        if (!path || path === '#') return;
+        navigate(path, options);
+        closeSidebarAfterNavigation();
+    }, [navigate, closeSidebarAfterNavigation]);
+
+    const handleSidebarMouseEnter = useCallback(() => {
+        if (isMobile) return;
+        if (state === 'collapsed') {
+            hoverExpandedRef.current = true;
+            setOpen(true);
+        }
+    }, [isMobile, state, setOpen]);
+
+    const handleSidebarMouseLeave = useCallback(() => {
+        if (isMobile) return;
+        if (hoverExpandedRef.current) {
+            hoverExpandedRef.current = false;
+            setOpen(false);
+        }
+    }, [isMobile, setOpen]);
 
     const menuItems = [
         {
@@ -81,7 +114,8 @@ const Sidebar = () => {
             hasSubmenu: true,
             submenu: [
                 { label: 'Loading Advance', path: '/transactions/loading-advance' },
-                { label: 'Acknowledgement', path: '/transactions/acknowledgement' }
+                { label: 'Acknowledgement', path: '/transactions/acknowledgement' },
+                { label: 'Dedicated & Market Settlement', path: '/transactions/dedicated-market-settlement' }
             ]
         },
         {
@@ -116,6 +150,8 @@ const Sidebar = () => {
         <ShadcnSidebar
             collapsible="icon"
             className="border border-white/10 bg-[#2f343d] text-white shadow-soft rounded-3xl m-6 overflow-hidden"
+            onMouseEnter={handleSidebarMouseEnter}
+            onMouseLeave={handleSidebarMouseLeave}
         >
             <SidebarHeader className="p-6 border-b border-white/10">
                 <div className="flex items-center gap-3">
@@ -167,7 +203,7 @@ const Sidebar = () => {
                                                                 href={subItem.path}
                                                                 onClick={(e) => {
                                                                     e.preventDefault();
-                                                                    navigate(subItem.path);
+                                                                    navigateAndCloseSidebar(subItem.path);
                                                                 }}
                                                                 className={cn(
                                                                     "w-full text-sm py-2 px-3 rounded-lg transition-colors",
@@ -200,7 +236,7 @@ const Sidebar = () => {
                                                 href={item.path}
                                                 onClick={(e) => {
                                                     e.preventDefault();
-                                                    if (item.path !== '#') navigate(item.path);
+                                                    navigateAndCloseSidebar(item.path);
                                                 }}
                                             >
                                                 {item.icon}
@@ -235,7 +271,7 @@ const Sidebar = () => {
                             className="cursor-pointer"
                             onClick={() => {
                                 localStorage.removeItem('auth_user');
-                                navigate('/login', { replace: true });
+                                navigateAndCloseSidebar('/login', { replace: true });
                             }}
                         >
                             <LogOut className="w-4 h-4 mr-2" /> Logout

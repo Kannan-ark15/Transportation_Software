@@ -56,6 +56,17 @@ export const loadingAdvanceAPI = {
 };
 
 export const acknowledgementAPI = generateCRUD('/acknowledgements');
+export const dedicatedMarketSettlementAPI = {
+    ...generateCRUD('/dedicated-market-settlements'),
+    getOwners: async () => {
+        const response = await api.get('/dedicated-market-settlements/owners');
+        return response.data;
+    },
+    getReadyVouchers: async (params = {}) => {
+        const response = await api.get('/dedicated-market-settlements/ready-vouchers', { params });
+        return response.data;
+    }
+};
 
 export const authAPI = {
     register: async (data) => {

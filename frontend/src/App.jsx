@@ -17,6 +17,7 @@ import TemplatesPage from './components/TemplatesPage';
 import LoadingAdvance from './components/LoadingAdvance';
 import LoadingAdvanceDetail from './components/LoadingAdvanceDetail';
 import Acknowledgement from './components/Acknowledgement';
+import DedicatedMarketSettlement from './components/DedicatedMarketSettlement';
 
 function App() {
     const isAuthenticated = () => Boolean(localStorage.getItem('auth_user'));
@@ -54,6 +55,7 @@ function App() {
                         <Route path="/transactions/loading-advance" element={<LoadingAdvance />} />
                         <Route path="/transactions/loading-advance/:id" element={<LoadingAdvanceDetail />} />
                         <Route path="/transactions/acknowledgement" element={<Acknowledgement />} />
+                        <Route path="/transactions/dedicated-market-settlement" element={<DedicatedMarketSettlement />} />
                         <Route path="/templates" element={<TemplatesPage />} />
                     </Route>
                     <Route path="*" element={<Navigate to="/" replace />} />

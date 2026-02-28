@@ -206,5 +206,50 @@ CREATE TRIGGER update_acknowledgements_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
+-- Dedicated & Market Vehicle Balance Settlement (Transactions)
+CREATE TABLE IF NOT EXISTS dedicated_market_settlements (
+    id SERIAL PRIMARY KEY,
+    owner_id INTEGER REFERENCES owners(id) ON DELETE RESTRICT,
+    owner_name VARCHAR(255) NOT NULL,
+    owner_type VARCHAR(50) NOT NULL CHECK (owner_type IN ('Dedicated', 'Market')),
+    cash_bank VARCHAR(10) NOT NULL CHECK (cash_bank IN ('Cash', 'Bank')),
+    bank_name VARCHAR(255),
+    branch VARCHAR(255),
+    account_no VARCHAR(30),
+    ifsc_code VARCHAR(20),
+    sum_ifas DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    commission_percent DECIMAL(6, 4) NOT NULL DEFAULT 6,
+    commission_amount DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    settlement_balance DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    settled BOOLEAN NOT NULL DEFAULT TRUE,
+    settled_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS dedicated_market_settlement_vouchers (
+    id SERIAL PRIMARY KEY,
+    settlement_id INTEGER REFERENCES dedicated_market_settlements(id) ON DELETE CASCADE,
+    acknowledgement_id INTEGER REFERENCES acknowledgements(id) ON DELETE RESTRICT,
+    loading_advance_id INTEGER UNIQUE REFERENCES loading_advances(id) ON DELETE RESTRICT,
+    vehicle_number VARCHAR(50) NOT NULL,
+    voucher_number VARCHAR(20) NOT NULL,
+    sum_ifas DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    commission_amount DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    final_balance DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_dm_settlements_owner_id ON dedicated_market_settlements(owner_id);
+CREATE INDEX IF NOT EXISTS idx_dm_settlements_owner_name ON dedicated_market_settlements(owner_name);
+CREATE INDEX IF NOT EXISTS idx_dm_settlements_created_at ON dedicated_market_settlements(created_at);
+CREATE INDEX IF NOT EXISTS idx_dm_vouchers_settlement_id ON dedicated_market_settlement_vouchers(settlement_id);
+CREATE INDEX IF NOT EXISTS idx_dm_vouchers_voucher_number ON dedicated_market_settlement_vouchers(voucher_number);
+
+CREATE TRIGGER update_dedicated_market_settlements_updated_at
+    BEFORE UPDATE ON dedicated_market_settlements
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
 -- Add TDS column to loading_advances table if it doesn't exist
 ALTER TABLE IF EXISTS loading_advances ADD COLUMN IF NOT EXISTS tds DECIMAL(10, 2) DEFAULT 0 NOT NULL;
