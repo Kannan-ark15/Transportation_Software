@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
     LayoutDashboard,
@@ -46,10 +46,16 @@ const Sidebar = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { isMobile, state, setOpen, setOpenMobile } = useSidebar();
+    const isSidebarHoveredRef = useRef(false);
     const hoverExpandedRef = useRef(false);
+    const hoverCloseTimerRef = useRef(null);
     const authUser = (() => { try { return JSON.parse(localStorage.getItem('auth_user') || '{}'); } catch { return {}; } })();
     const displayName = authUser.full_name || authUser.email || 'Admin User';
     const initials = displayName.split(' ').filter(Boolean).slice(0, 2).map(s => s[0].toUpperCase()).join('') || 'A';
+
+    useEffect(() => () => {
+        if (hoverCloseTimerRef.current) clearTimeout(hoverCloseTimerRef.current);
+    }, []);
 
     const closeSidebarAfterNavigation = useCallback(() => {
         if (isMobile) {
@@ -67,6 +73,11 @@ const Sidebar = () => {
 
     const handleSidebarMouseEnter = useCallback(() => {
         if (isMobile) return;
+        isSidebarHoveredRef.current = true;
+        if (hoverCloseTimerRef.current) {
+            clearTimeout(hoverCloseTimerRef.current);
+            hoverCloseTimerRef.current = null;
+        }
         if (state === 'collapsed') {
             hoverExpandedRef.current = true;
             setOpen(true);
@@ -75,9 +86,15 @@ const Sidebar = () => {
 
     const handleSidebarMouseLeave = useCallback(() => {
         if (isMobile) return;
+        isSidebarHoveredRef.current = false;
         if (hoverExpandedRef.current) {
-            hoverExpandedRef.current = false;
-            setOpen(false);
+            if (hoverCloseTimerRef.current) clearTimeout(hoverCloseTimerRef.current);
+            hoverCloseTimerRef.current = setTimeout(() => {
+                if (isSidebarHoveredRef.current) return;
+                hoverExpandedRef.current = false;
+                setOpen(false);
+                hoverCloseTimerRef.current = null;
+            }, 180);
         }
     }, [isMobile, setOpen]);
 
@@ -115,7 +132,7 @@ const Sidebar = () => {
             submenu: [
                 { label: 'Loading Advance', path: '/transactions/loading-advance' },
                 { label: 'Acknowledgement', path: '/transactions/acknowledgement' },
-                { label: 'Dedicated & Market Settlement', path: '/transactions/dedicated-market-settlement' }
+                { label: 'Balance Settlement', path: '/transactions/balance-settlement' }
             ]
         },
         {
@@ -149,7 +166,7 @@ const Sidebar = () => {
     return (
         <ShadcnSidebar
             collapsible="icon"
-            className="border border-white/10 bg-[#2f343d] text-white shadow-soft rounded-3xl m-6 overflow-hidden"
+            className="border border-white/10 bg-[#2f343d] text-white shadow-soft rounded-3xl m-6 overflow-hidden transition-[width,left,right] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
             onMouseEnter={handleSidebarMouseEnter}
             onMouseLeave={handleSidebarMouseLeave}
         >

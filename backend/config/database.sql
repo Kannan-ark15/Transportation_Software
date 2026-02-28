@@ -251,5 +251,58 @@ CREATE TRIGGER update_dedicated_market_settlements_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
+-- Own Vehicle Balance Settlement (Transactions)
+CREATE TABLE IF NOT EXISTS own_vehicle_settlements (
+    id SERIAL PRIMARY KEY,
+    driver_id INTEGER REFERENCES drivers(id) ON DELETE RESTRICT,
+    driver_name VARCHAR(255) NOT NULL,
+    cash_bank VARCHAR(10) NOT NULL CHECK (cash_bank IN ('Cash', 'Bank')),
+    bank_name VARCHAR(255),
+    branch VARCHAR(255),
+    account_number VARCHAR(30),
+    ifsc_code VARCHAR(20),
+    total_driver_bata DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    total_driver_balance DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    driver_salary_payable DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    settled BOOLEAN NOT NULL DEFAULT TRUE,
+    settled_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS own_vehicle_settlement_vouchers (
+    id SERIAL PRIMARY KEY,
+    settlement_id INTEGER REFERENCES own_vehicle_settlements(id) ON DELETE CASCADE,
+    acknowledgement_id INTEGER REFERENCES acknowledgements(id) ON DELETE RESTRICT,
+    loading_advance_id INTEGER UNIQUE REFERENCES loading_advances(id) ON DELETE RESTRICT,
+    vehicle_number VARCHAR(50) NOT NULL,
+    voucher_number VARCHAR(20) NOT NULL,
+    sum_ifas DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    driver_bata DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    unloading DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    tarpaulin DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    city_tax DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    maintenance DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    parking_charges DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    expenditure_1 DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    expenditure_2 DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    expenditure_3 DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    fuel_amount DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    driver_loading_advance DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    driver_balance DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_ov_settlements_driver_id ON own_vehicle_settlements(driver_id);
+CREATE INDEX IF NOT EXISTS idx_ov_settlements_driver_name ON own_vehicle_settlements(driver_name);
+CREATE INDEX IF NOT EXISTS idx_ov_settlements_created_at ON own_vehicle_settlements(created_at);
+CREATE INDEX IF NOT EXISTS idx_ov_vouchers_settlement_id ON own_vehicle_settlement_vouchers(settlement_id);
+CREATE INDEX IF NOT EXISTS idx_ov_vouchers_voucher_number ON own_vehicle_settlement_vouchers(voucher_number);
+
+CREATE TRIGGER update_own_vehicle_settlements_updated_at
+    BEFORE UPDATE ON own_vehicle_settlements
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
 -- Add TDS column to loading_advances table if it doesn't exist
 ALTER TABLE IF EXISTS loading_advances ADD COLUMN IF NOT EXISTS tds DECIMAL(10, 2) DEFAULT 0 NOT NULL;

@@ -68,6 +68,18 @@ export const dedicatedMarketSettlementAPI = {
     }
 };
 
+export const ownVehicleSettlementAPI = {
+    ...generateCRUD('/own-vehicle-settlements'),
+    getDrivers: async () => {
+        const response = await api.get('/own-vehicle-settlements/drivers');
+        return response.data;
+    },
+    getReadyVouchers: async (params = {}) => {
+        const response = await api.get('/own-vehicle-settlements/ready-vouchers', { params });
+        return response.data;
+    }
+};
+
 export const authAPI = {
     register: async (data) => {
         const response = await api.post('/auth/register', data);

@@ -18,6 +18,8 @@ import LoadingAdvance from './components/LoadingAdvance';
 import LoadingAdvanceDetail from './components/LoadingAdvanceDetail';
 import Acknowledgement from './components/Acknowledgement';
 import DedicatedMarketSettlement from './components/DedicatedMarketSettlement';
+import OwnVehicleSettlement from './components/OwnVehicleSettlement';
+import BalanceSettlement from './components/BalanceSettlement';
 
 function App() {
     const isAuthenticated = () => Boolean(localStorage.getItem('auth_user'));
@@ -55,7 +57,9 @@ function App() {
                         <Route path="/transactions/loading-advance" element={<LoadingAdvance />} />
                         <Route path="/transactions/loading-advance/:id" element={<LoadingAdvanceDetail />} />
                         <Route path="/transactions/acknowledgement" element={<Acknowledgement />} />
+                        <Route path="/transactions/balance-settlement" element={<BalanceSettlement />} />
                         <Route path="/transactions/dedicated-market-settlement" element={<DedicatedMarketSettlement />} />
+                        <Route path="/transactions/own-vehicle-settlement" element={<OwnVehicleSettlement />} />
                         <Route path="/templates" element={<TemplatesPage />} />
                     </Route>
                     <Route path="*" element={<Navigate to="/" replace />} />
