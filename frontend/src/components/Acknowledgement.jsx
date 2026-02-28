@@ -10,6 +10,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Loader2 } from 'lucide-react';
 import AcknowledgementTable from './AcknowledgementTable';
 
+const buildAcknowledgementNumber = (invoiceNumber = '') =>
+    `ACK${String(invoiceNumber).replace(/\s+/g, '')}`;
+const getSystemDate = () => new Date().toISOString().split('T')[0];
+
 const Acknowledgement = () => {
     const [loading, setLoading] = useState(true), [advances, setAdvances] = useState([]);
     const [voucherId, setVoucherId] = useState(''), [voucherInfo, setVoucherInfo] = useState(null), [invoices, setInvoices] = useState([]);
@@ -36,7 +40,16 @@ const Acknowledgement = () => {
         if (!id) return setInvoices([]);
         try {
             const res = await loadingAdvanceAPI.getInvoices(id);
-            if (res.success) setInvoices(res.data.map(inv => ({ ...inv, status: 'Pending', returned_amount: 0 })));
+            if (res.success) {
+                const systemDate = getSystemDate();
+                setInvoices(res.data.map(inv => ({
+                    ...inv,
+                    status: 'Pending',
+                    returned_amount: 0,
+                    acknowledgement_number: buildAcknowledgementNumber(inv.invoice_number),
+                    acknowledgement_date: systemDate
+                })));
+            }
         } catch {
             setError('Failed to load invoices for the selected voucher');
             setInvoices([]);
@@ -78,11 +91,22 @@ const Acknowledgement = () => {
                             <CardContent className="space-y-3">
                                 <div className="rounded-md border border-slate-100 overflow-hidden">
                                     <Table>
-                                        <TableHeader className="bg-slate-50/60"><TableRow><TableHead>Invoice No</TableHead><TableHead>Invoice Date</TableHead><TableHead>To Place</TableHead><TableHead>Quantity</TableHead><TableHead>Acknowledgement Status</TableHead><TableHead>Returned Amount</TableHead></TableRow></TableHeader>
+                                        <TableHeader className="bg-slate-50/60">
+                                            <TableRow>
+                                                <TableHead>Invoice Number</TableHead>
+                                                <TableHead>Dealer Name</TableHead>
+                                                <TableHead>Quantity</TableHead>
+                                                <TableHead>IFA (Invoice Freight Amount)</TableHead>
+                                                <TableHead>Acknowledgement Status</TableHead>
+                                                <TableHead>Returned Amount</TableHead>
+                                                <TableHead>Acknowledgement Number</TableHead>
+                                                <TableHead>Acknowledgement Date</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
                                         <TableBody>
                                             {invoices.length === 0 && (
                                                 <TableRow>
-                                                    <TableCell colSpan={6} className="text-center text-sm text-slate-400 py-6">
+                                                    <TableCell colSpan={8} className="text-center text-sm text-slate-400 py-6">
                                                         Select a voucher to load invoice rows.
                                                     </TableCell>
                                                 </TableRow>
@@ -90,9 +114,9 @@ const Acknowledgement = () => {
                                             {invoices.map((inv, i) => (
                                                 <TableRow key={inv.id}>
                                                     <TableCell>{inv.invoice_number}</TableCell>
-                                                    <TableCell>{inv.invoice_date || ''}</TableCell>
-                                                    <TableCell>{inv.to_place}</TableCell>
+                                                    <TableCell>{inv.dealer_name || '-'}</TableCell>
                                                     <TableCell>{Number(inv.quantity || 0).toFixed(3)}</TableCell>
+                                                    <TableCell>{Number(inv.ifa_amount || 0).toFixed(2)}</TableCell>
                                                     <TableCell>
                                                         <div className="flex items-center gap-3 text-xs">
                                                             {['Acknowledged', 'Shortage', 'Pending'].map(s => (
@@ -108,9 +132,14 @@ const Acknowledgement = () => {
                                                             type="number"
                                                             step="0.01"
                                                             value={inv.returned_amount}
-                                                            disabled={inv.status !== 'Shortage'}
-                                                            onChange={e => inv.status === 'Shortage' && updateInvoice(i, { returned_amount: e.target.value })}
+                                                            onChange={e => updateInvoice(i, { returned_amount: e.target.value })}
                                                         />
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Input disabled value={inv.acknowledgement_number || buildAcknowledgementNumber(inv.invoice_number)} />
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Input disabled value={inv.acknowledgement_date || getSystemDate()} />
                                                     </TableCell>
                                                 </TableRow>
                                             ))}

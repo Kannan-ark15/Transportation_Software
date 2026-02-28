@@ -2,6 +2,8 @@ const pool = require('../config/database');
 
 const statuses = new Set(['Acknowledged', 'Shortage', 'Pending']);
 const nearlyEqual = (a, b, eps = 0.01) => Math.abs(a - b) < eps;
+const buildAcknowledgementNumber = (invoiceNumber = '') =>
+    `ACK${String(invoiceNumber).replace(/\s+/g, '')}`;
 
 const getAllAcknowledgements = async (req, res, next) => {
     try {
@@ -30,7 +32,7 @@ const createAcknowledgement = async (req, res, next) => {
         if (exists.rows.length) return res.status(400).json({ success: false, message: 'Acknowledgement already exists for this voucher' });
 
         const invRes = await client.query(
-            'SELECT id, invoice_number, to_place, quantity, ifa_amount FROM loading_advance_invoices WHERE loading_advance_id = $1 ORDER BY id',
+            'SELECT id, invoice_number, dealer_name, to_place, quantity, ifa_amount FROM loading_advance_invoices WHERE loading_advance_id = $1 ORDER BY id',
             [loading_advance_id]
         );
         if (invRes.rows.length === 0) return res.status(400).json({ success: false, message: 'No invoices found for this voucher' });
@@ -50,7 +52,13 @@ const createAcknowledgement = async (req, res, next) => {
             if (status === 'Acknowledged' && !nearlyEqual(returned, ifa)) return res.status(400).json({ success: false, message: `Returned amount must equal IFA for invoice ${inv.invoice_number}` });
             if (status === 'Shortage' && !(returned > 0 && returned < ifa)) return res.status(400).json({ success: false, message: `Returned amount must be less than IFA for invoice ${inv.invoice_number}` });
             if (status === 'Pending' && returned !== 0) return res.status(400).json({ success: false, message: `Returned amount must be 0 for invoice ${inv.invoice_number}` });
-            rows.push({ ...inv, status, returned_amount: returned });
+            rows.push({
+                ...inv,
+                status,
+                returned_amount: returned,
+                acknowledgement_number: buildAcknowledgementNumber(inv.invoice_number),
+                acknowledgement_date: new Date().toISOString().split('T')[0]
+            });
             seen.add(invId);
         }
         if (seen.size !== invMap.size) return res.status(400).json({ success: false, message: 'All invoices must be acknowledged' });
@@ -70,10 +78,13 @@ const createAcknowledgement = async (req, res, next) => {
         );
         const ackId = ackRes.rows[0].id;
         const insert = `INSERT INTO acknowledgement_invoices
-            (acknowledgement_id, loading_advance_invoice_id, invoice_number, to_place, quantity, ifa_amount, status, returned_amount)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`;
+            (acknowledgement_id, loading_advance_invoice_id, invoice_number, dealer_name, to_place, quantity, ifa_amount, status, returned_amount, acknowledgement_number, acknowledgement_date)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`;
         for (const r of rows) {
-            await client.query(insert, [ackId, r.id, r.invoice_number, r.to_place, r.quantity, r.ifa_amount, r.status, r.returned_amount]);
+            await client.query(insert, [
+                ackId, r.id, r.invoice_number, r.dealer_name, r.to_place, r.quantity, r.ifa_amount,
+                r.status, r.returned_amount, r.acknowledgement_number, r.acknowledgement_date
+            ]);
         }
         await client.query('COMMIT');
         res.status(201).json({ success: true, data: ackRes.rows[0] });

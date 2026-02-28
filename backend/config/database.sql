@@ -152,11 +152,14 @@ CREATE TABLE IF NOT EXISTS acknowledgement_invoices (
     acknowledgement_id INTEGER REFERENCES acknowledgements(id) ON DELETE CASCADE,
     loading_advance_invoice_id INTEGER REFERENCES loading_advance_invoices(id) ON DELETE CASCADE,
     invoice_number VARCHAR(50) NOT NULL,
+    dealer_name VARCHAR(255) NOT NULL,
     to_place VARCHAR(255) NOT NULL,
     quantity DECIMAL(10, 3) NOT NULL,
     ifa_amount DECIMAL(12, 2) NOT NULL,
     status VARCHAR(20) NOT NULL CHECK (status IN ('Acknowledged', 'Shortage', 'Pending')),
     returned_amount DECIMAL(12, 2) NOT NULL,
+    acknowledgement_number VARCHAR(100) NOT NULL,
+    acknowledgement_date DATE NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -164,6 +167,30 @@ CREATE INDEX IF NOT EXISTS idx_acknowledgements_loading_advance ON acknowledgeme
 CREATE INDEX IF NOT EXISTS idx_acknowledgements_voucher_number ON acknowledgements(voucher_number);
 CREATE INDEX IF NOT EXISTS idx_acknowledgement_invoices_ack_id ON acknowledgement_invoices(acknowledgement_id);
 CREATE INDEX IF NOT EXISTS idx_acknowledgement_invoices_status ON acknowledgement_invoices(status);
+CREATE INDEX IF NOT EXISTS idx_acknowledgement_invoices_ack_no ON acknowledgement_invoices(acknowledgement_number);
+
+ALTER TABLE IF EXISTS acknowledgement_invoices ADD COLUMN IF NOT EXISTS dealer_name VARCHAR(255);
+ALTER TABLE IF EXISTS acknowledgement_invoices ADD COLUMN IF NOT EXISTS acknowledgement_number VARCHAR(100);
+ALTER TABLE IF EXISTS acknowledgement_invoices ADD COLUMN IF NOT EXISTS acknowledgement_date DATE;
+
+UPDATE acknowledgement_invoices ai
+SET dealer_name = lai.dealer_name
+FROM loading_advance_invoices lai
+WHERE ai.loading_advance_invoice_id = lai.id
+    AND (ai.dealer_name IS NULL OR TRIM(ai.dealer_name) = '');
+
+UPDATE acknowledgement_invoices
+SET acknowledgement_number = 'ACK' || regexp_replace(COALESCE(invoice_number, ''), '\s+', '', 'g')
+WHERE acknowledgement_number IS NULL
+    OR TRIM(acknowledgement_number) = '';
+
+UPDATE acknowledgement_invoices
+SET acknowledgement_date = COALESCE(created_at::date, CURRENT_DATE)
+WHERE acknowledgement_date IS NULL;
+
+ALTER TABLE IF EXISTS acknowledgement_invoices ALTER COLUMN dealer_name SET NOT NULL;
+ALTER TABLE IF EXISTS acknowledgement_invoices ALTER COLUMN acknowledgement_number SET NOT NULL;
+ALTER TABLE IF EXISTS acknowledgement_invoices ALTER COLUMN acknowledgement_date SET NOT NULL;
 
 CREATE TRIGGER update_acknowledgements_updated_at
     BEFORE UPDATE ON acknowledgements
