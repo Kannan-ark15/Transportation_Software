@@ -14,8 +14,8 @@ CREATE TABLE IF NOT EXISTS drivers (
     id SERIAL PRIMARY KEY,
     driver_id VARCHAR(6) UNIQUE NOT NULL, -- 6 digit system generated
     driver_name VARCHAR(255) NOT NULL,
-    primary_contact_no VARCHAR(15) UNIQUE NOT NULL,
-    secondary_contact_no VARCHAR(15) UNIQUE,
+    primary_contact_no VARCHAR(15) NOT NULL,
+    secondary_contact_no VARCHAR(15),
     blood_group VARCHAR(10) NOT NULL,
     address TEXT NOT NULL,
     license_no VARCHAR(50) UNIQUE NOT NULL,
@@ -149,6 +149,60 @@ $$;
 
 -- GST number can repeat across masters
 ALTER TABLE IF EXISTS companies DROP CONSTRAINT IF EXISTS companies_gst_no_key;
+DO $$
+DECLARE
+    row_rec RECORD;
+BEGIN
+    FOR row_rec IN
+        SELECT n.nspname AS schema_name,
+               t.relname AS table_name,
+               c.conname AS constraint_name
+        FROM pg_constraint c
+        JOIN pg_class t ON t.oid = c.conrelid
+        JOIN pg_namespace n ON n.oid = t.relnamespace
+        JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = c.conkey[1]
+        WHERE c.contype = 'u'
+            AND n.nspname = 'public'
+            AND array_length(c.conkey, 1) = 1
+            AND a.attname = 'gst_no'
+    LOOP
+        EXECUTE format(
+            'ALTER TABLE %I.%I DROP CONSTRAINT IF EXISTS %I',
+            row_rec.schema_name,
+            row_rec.table_name,
+            row_rec.constraint_name
+        );
+    END LOOP;
+END;
+$$;
+
+-- Contact numbers can repeat across masters
+DO $$
+DECLARE
+    row_rec RECORD;
+BEGIN
+    FOR row_rec IN
+        SELECT n.nspname AS schema_name,
+               t.relname AS table_name,
+               c.conname AS constraint_name
+        FROM pg_constraint c
+        JOIN pg_class t ON t.oid = c.conrelid
+        JOIN pg_namespace n ON n.oid = t.relnamespace
+        JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = c.conkey[1]
+        WHERE c.contype = 'u'
+            AND n.nspname = 'public'
+            AND array_length(c.conkey, 1) = 1
+            AND a.attname IN ('contact_no', 'primary_contact_no', 'secondary_contact_no', 'contact_no_1', 'contact_no_2', 'sales_officer_no')
+    LOOP
+        EXECUTE format(
+            'ALTER TABLE %I.%I DROP CONSTRAINT IF EXISTS %I',
+            row_rec.schema_name,
+            row_rec.table_name,
+            row_rec.constraint_name
+        );
+    END LOOP;
+END;
+$$;
 
 -- 5. DEALER MASTER
 CREATE TABLE IF NOT EXISTS dealers (

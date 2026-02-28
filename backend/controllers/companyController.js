@@ -15,14 +15,6 @@ class CompanyController {
                 });
             }
 
-            const contactExists = await CompanyModel.existsByContact(companyData.contact_no);
-            if (contactExists) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Contact number already exists'
-                });
-            }
-
             // Create the company
             const newCompany = await CompanyModel.create(companyData);
 
@@ -109,14 +101,6 @@ class CompanyController {
                 return res.status(400).json({
                     success: false,
                     message: 'Company name already exists'
-                });
-            }
-
-            const contactExists = await CompanyModel.existsByContact(companyData.contact_no, id);
-            if (contactExists) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Contact number already exists'
                 });
             }
 

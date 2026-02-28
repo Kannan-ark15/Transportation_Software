@@ -5,9 +5,6 @@ class DriverController {
         try {
             const driverData = req.body;
 
-            if (await DriverModel.existsByContact(driverData.primary_contact_no)) {
-                return res.status(400).json({ success: false, message: 'Contact number already exists' });
-            }
             if (await DriverModel.existsByLicense(driverData.license_no)) {
                 return res.status(400).json({ success: false, message: 'License number already exists' });
             }
@@ -50,9 +47,6 @@ class DriverController {
             const { id } = req.params;
             const driverData = req.body;
 
-            if (await DriverModel.existsByContact(driverData.primary_contact_no, id)) {
-                return res.status(400).json({ success: false, message: 'Contact number already exists' });
-            }
             if (await DriverModel.existsByLicense(driverData.license_no, id)) {
                 return res.status(400).json({ success: false, message: 'License number already exists' });
             }

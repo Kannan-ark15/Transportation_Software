@@ -7,6 +7,7 @@ import {
     Database,
     FileText,
     ClipboardList,
+    Landmark,
     BarChart3,
     Truck,
     LogOut
@@ -133,6 +134,15 @@ const Sidebar = () => {
                 { label: 'Loading Advance', path: '/transactions/loading-advance' },
                 { label: 'Acknowledgement', path: '/transactions/acknowledgement' },
                 { label: 'Balance Settlement', path: '/transactions/balance-settlement' }
+            ]
+        },
+        {
+            id: 'advances-loans',
+            label: 'Advances and Loans',
+            icon: <Landmark className="w-5 h-5" />,
+            hasSubmenu: true,
+            submenu: [
+                { label: 'Loan Master', path: '/advances-loans/loan-master' }
             ]
         },
         {

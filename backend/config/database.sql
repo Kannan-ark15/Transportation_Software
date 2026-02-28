@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS companies (
     place VARCHAR(255) NOT NULL,
     gst_no VARCHAR(15) NOT NULL,
     pin_code VARCHAR(6) NOT NULL,
-    contact_no VARCHAR(15) NOT NULL UNIQUE,
+    contact_no VARCHAR(15) NOT NULL,
     email_id VARCHAR(255) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -20,6 +20,61 @@ CREATE TABLE IF NOT EXISTS companies (
 
 -- GST number can repeat across masters
 ALTER TABLE IF EXISTS companies DROP CONSTRAINT IF EXISTS companies_gst_no_key;
+DO $$
+DECLARE
+    row_rec RECORD;
+BEGIN
+    FOR row_rec IN
+        SELECT n.nspname AS schema_name,
+               t.relname AS table_name,
+               c.conname AS constraint_name
+        FROM pg_constraint c
+        JOIN pg_class t ON t.oid = c.conrelid
+        JOIN pg_namespace n ON n.oid = t.relnamespace
+        JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = c.conkey[1]
+        WHERE c.contype = 'u'
+            AND n.nspname = 'public'
+            AND array_length(c.conkey, 1) = 1
+            AND a.attname = 'gst_no'
+    LOOP
+        EXECUTE format(
+            'ALTER TABLE %I.%I DROP CONSTRAINT IF EXISTS %I',
+            row_rec.schema_name,
+            row_rec.table_name,
+            row_rec.constraint_name
+        );
+    END LOOP;
+END;
+$$;
+
+-- Contact numbers can repeat across masters
+ALTER TABLE IF EXISTS companies DROP CONSTRAINT IF EXISTS companies_contact_no_key;
+DO $$
+DECLARE
+    row_rec RECORD;
+BEGIN
+    FOR row_rec IN
+        SELECT n.nspname AS schema_name,
+               t.relname AS table_name,
+               c.conname AS constraint_name
+        FROM pg_constraint c
+        JOIN pg_class t ON t.oid = c.conrelid
+        JOIN pg_namespace n ON n.oid = t.relnamespace
+        JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = c.conkey[1]
+        WHERE c.contype = 'u'
+            AND n.nspname = 'public'
+            AND array_length(c.conkey, 1) = 1
+            AND a.attname IN ('contact_no', 'primary_contact_no', 'secondary_contact_no', 'contact_no_1', 'contact_no_2', 'sales_officer_no')
+    LOOP
+        EXECUTE format(
+            'ALTER TABLE %I.%I DROP CONSTRAINT IF EXISTS %I',
+            row_rec.schema_name,
+            row_rec.table_name,
+            row_rec.constraint_name
+        );
+    END LOOP;
+END;
+$$;
 
 -- Create indexes for better query performance
 CREATE INDEX IF NOT EXISTS idx_companies_company_name ON companies(company_name);
@@ -301,6 +356,50 @@ CREATE INDEX IF NOT EXISTS idx_ov_vouchers_voucher_number ON own_vehicle_settlem
 
 CREATE TRIGGER update_own_vehicle_settlements_updated_at
     BEFORE UPDATE ON own_vehicle_settlements
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- Loan Master (Advances and Loans)
+CREATE TABLE IF NOT EXISTS loan_masters (
+    id SERIAL PRIMARY KEY,
+    bank_id INTEGER REFERENCES banks(id) ON DELETE RESTRICT,
+    bank_name VARCHAR(255) NOT NULL,
+    vehicle_id INTEGER REFERENCES vehicles(id) ON DELETE RESTRICT,
+    vehicle_number VARCHAR(50) NOT NULL,
+    financier TEXT,
+    agreement_number VARCHAR(50) NOT NULL,
+    loan_type VARCHAR(150) NOT NULL,
+    other_loan_type TEXT,
+    loan_amount DECIMAL(12, 2) NOT NULL,
+    tenure INTEGER NOT NULL,
+    total_installments INTEGER NOT NULL,
+    frequency VARCHAR(40) NOT NULL,
+    total_due DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS loan_master_schedules (
+    id SERIAL PRIMARY KEY,
+    loan_master_id INTEGER REFERENCES loan_masters(id) ON DELETE CASCADE,
+    installment_number INTEGER NOT NULL,
+    due_date DATE NOT NULL,
+    principal DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    interest DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    due_amount DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    outstanding_principal DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (loan_master_id, installment_number)
+);
+
+CREATE INDEX IF NOT EXISTS idx_loan_masters_bank_id ON loan_masters(bank_id);
+CREATE INDEX IF NOT EXISTS idx_loan_masters_vehicle_id ON loan_masters(vehicle_id);
+CREATE INDEX IF NOT EXISTS idx_loan_masters_agreement_number ON loan_masters(agreement_number);
+CREATE INDEX IF NOT EXISTS idx_loan_masters_created_at ON loan_masters(created_at);
+CREATE INDEX IF NOT EXISTS idx_loan_master_schedules_loan_master_id ON loan_master_schedules(loan_master_id);
+
+CREATE TRIGGER update_loan_masters_updated_at
+    BEFORE UPDATE ON loan_masters
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 

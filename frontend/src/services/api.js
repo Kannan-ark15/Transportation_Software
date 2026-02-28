@@ -80,6 +80,14 @@ export const ownVehicleSettlementAPI = {
     }
 };
 
+export const loanMasterAPI = {
+    ...generateCRUD('/loan-masters'),
+    getMeta: async () => {
+        const response = await api.get('/loan-masters/meta');
+        return response.data;
+    }
+};
+
 export const authAPI = {
     register: async (data) => {
         const response = await api.post('/auth/register', data);
