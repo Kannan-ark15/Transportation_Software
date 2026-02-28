@@ -21,10 +21,10 @@ CREATE TABLE IF NOT EXISTS drivers (
     license_no VARCHAR(50) UNIQUE NOT NULL,
     license_exp_date DATE NOT NULL,
     aadhar_no VARCHAR(20) UNIQUE NOT NULL,
-    bank_name VARCHAR(255) NOT NULL,
-    branch VARCHAR(255) NOT NULL,
-    account_number VARCHAR(30) NOT NULL,
-    ifsc_code VARCHAR(20) NOT NULL,
+    bank_name VARCHAR(255),
+    branch VARCHAR(255),
+    account_number VARCHAR(30),
+    ifsc_code VARCHAR(20),
     driver_status BOOLEAN DEFAULT TRUE NOT NULL, -- Toggle Active/Inactive
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -218,6 +218,12 @@ ALTER TABLE IF EXISTS pumps ALTER COLUMN bank_name DROP NOT NULL;
 ALTER TABLE IF EXISTS pumps ALTER COLUMN branch DROP NOT NULL;
 ALTER TABLE IF EXISTS pumps ALTER COLUMN account_number DROP NOT NULL;
 ALTER TABLE IF EXISTS pumps ALTER COLUMN ifsc_code DROP NOT NULL;
+
+-- Driver Master: bank details section is optional
+ALTER TABLE IF EXISTS drivers ALTER COLUMN bank_name DROP NOT NULL;
+ALTER TABLE IF EXISTS drivers ALTER COLUMN branch DROP NOT NULL;
+ALTER TABLE IF EXISTS drivers ALTER COLUMN account_number DROP NOT NULL;
+ALTER TABLE IF EXISTS drivers ALTER COLUMN ifsc_code DROP NOT NULL;
 
 -- Dealer Master: GST and contacts are optional
 ALTER TABLE IF EXISTS dealers ALTER COLUMN gst_no DROP NOT NULL;

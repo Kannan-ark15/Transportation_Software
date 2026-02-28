@@ -35,7 +35,7 @@ class DriverModel {
         const values = [
             driver_id, driver_name, primary_contact_no, secondary_contact_no || null,
             blood_group, address, license_no, license_exp_date, aadhar_no,
-            bank_name, branch, account_number, ifsc_code, driver_status ?? true
+            bank_name || null, branch || null, account_number || null, ifsc_code || null, driver_status ?? true
         ];
 
         const result = await pool.query(query, values);
@@ -81,8 +81,8 @@ class DriverModel {
 
         const values = [
             primary_contact_no, secondary_contact_no || null, address,
-            license_no, license_exp_date, aadhar_no, bank_name,
-            branch, account_number, ifsc_code, driver_status, id
+            license_no, license_exp_date, aadhar_no, bank_name || null,
+            branch || null, account_number || null, ifsc_code || null, driver_status, id
         ];
 
         const result = await pool.query(query, values);
