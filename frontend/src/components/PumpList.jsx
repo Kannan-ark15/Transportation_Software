@@ -131,7 +131,15 @@ const PumpList = () => {
         setModalMode(mode);
         setSelectedPump(pump);
         if (pump) {
-            setFormData({ ...pump, company_address_2: pump.company_address_2 || '' });
+            setFormData({
+                ...pump,
+                company_address_2: pump.company_address_2 || '',
+                gst_no: pump.gst_no || '',
+                bank_name: pump.bank_name || '',
+                branch: pump.branch || '',
+                account_number: pump.account_number || '',
+                ifsc_code: pump.ifsc_code || ''
+            });
         } else {
             setFormData({
                 pump_name: '', rate: '', contact_person: '', contact_no: '', email_id: '',
@@ -466,7 +474,7 @@ const PumpList = () => {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="gst" className="required flex items-center gap-2">
+                                <Label htmlFor="gst" className="flex items-center gap-2">
                                     <Globe className="w-3 h-3 text-slate-400" /> GST Number
                                 </Label>
                                 <Input
@@ -477,7 +485,6 @@ const PumpList = () => {
                                     className="font-mono uppercase"
                                     placeholder="22AAAAA0000A1Z5"
                                     maxLength={15}
-                                    required
                                 />
                             </div>
                         </div>
@@ -485,28 +492,28 @@ const PumpList = () => {
                         <div className="space-y-4 pt-2">
                             <div className="flex items-center gap-2">
                                 <CreditCard className="w-4 h-4 text-slate-400" />
-                                <span className="text-sm font-bold text-slate-400 uppercase tracking-widest">Settlement Bank</span>
+                                <span className="text-sm font-bold text-slate-400 uppercase tracking-widest">Settlement Bank (Optional)</span>
                                 <Separator className="flex-1" />
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="bank_name" className="required">Bank Name</Label>
-                                    <Input id="bank_name" value={formData.bank_name} disabled={modalMode === 'view'} onChange={e => setFormData({ ...formData, bank_name: e.target.value })} required />
+                                    <Label htmlFor="bank_name">Bank Name</Label>
+                                    <Input id="bank_name" value={formData.bank_name} disabled={modalMode === 'view'} onChange={e => setFormData({ ...formData, bank_name: e.target.value })} />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="branch" className="required">Branch</Label>
-                                    <Input id="branch" value={formData.branch} disabled={modalMode === 'view'} onChange={e => setFormData({ ...formData, branch: e.target.value })} required />
+                                    <Label htmlFor="branch">Branch</Label>
+                                    <Input id="branch" value={formData.branch} disabled={modalMode === 'view'} onChange={e => setFormData({ ...formData, branch: e.target.value })} />
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="account_no" className="required">Account Number</Label>
-                                    <Input id="account_no" value={formData.account_number} disabled={modalMode === 'view'} onChange={e => setFormData({ ...formData, account_number: e.target.value })} required />
+                                    <Label htmlFor="account_no">Account Number</Label>
+                                    <Input id="account_no" value={formData.account_number} disabled={modalMode === 'view'} onChange={e => setFormData({ ...formData, account_number: e.target.value })} />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="ifsc" className="required font-mono">IFSC Code</Label>
-                                    <Input id="ifsc" value={formData.ifsc_code} disabled={modalMode === 'view'} onChange={e => setFormData({ ...formData, ifsc_code: e.target.value })} className="font-mono uppercase" required />
+                                    <Label htmlFor="ifsc" className="font-mono">IFSC Code</Label>
+                                    <Input id="ifsc" value={formData.ifsc_code} disabled={modalMode === 'view'} onChange={e => setFormData({ ...formData, ifsc_code: e.target.value })} className="font-mono uppercase" />
                                 </div>
                             </div>
                         </div>
