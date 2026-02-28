@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { vehicleAPI } from '../services/api';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ownerAPI, vehicleAPI } from '../services/api';
 import Pagination from './Pagination';
 import {
     Plus,
@@ -17,7 +17,6 @@ import {
     AlertCircle,
     CheckCircle2,
     ArrowUpRight,
-    ClipboardList,
     Fuel,
     Settings,
     Upload
@@ -61,6 +60,7 @@ const VehicleList = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [successMsg, setSuccessMsg] = useState('');
+    const [owners, setOwners] = useState([]);
 
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -99,10 +99,6 @@ const VehicleList = () => {
         fc_from_date: '',
         fc_till_date: '',
         fc_document: null,
-        bank_name: '',
-        branch: '',
-        account_number: '',
-        ifsc_code: '',
         status: 'Active'
     });
 
@@ -120,13 +116,26 @@ const VehicleList = () => {
         '16 WHEELER': ['Open Container', 'Container', 'Bulker'],
         '22 WHEELER': ['Trailer', 'Container']
     };
-    const ownersMap = {
-        'Own': ['Admin Services', 'Fleet Management'],
-        'Dedicated': ['External Partner A', 'Logistics Corp B', 'Express Delivery C'],
-        'Market': ['External Partner A', 'Logistics Corp B', 'Express Delivery C']
-    };
+    useEffect(() => {
+        loadVehicles();
+        loadOwners();
+    }, []);
 
-    useEffect(() => { loadVehicles(); }, []);
+    const ownerOptions = useMemo(() => {
+        const selectedType = String(formData.own_dedicated || '').trim().toLowerCase();
+        const filtered = owners
+            .filter(owner => String(owner.owner_type || '').trim().toLowerCase() === selectedType)
+            .filter(owner => String(owner.status || 'Active').trim().toLowerCase() === 'active')
+            .map(owner => owner.owner_name)
+            .filter(Boolean);
+        const uniqueOwners = Array.from(new Set(filtered));
+
+        if (formData.owner_name && !uniqueOwners.includes(formData.owner_name)) {
+            uniqueOwners.push(formData.owner_name);
+        }
+
+        return uniqueOwners;
+    }, [owners, formData.own_dedicated, formData.owner_name]);
 
     // Calculate GST and Total Insurance Amount
     useEffect(() => {
@@ -149,6 +158,15 @@ const VehicleList = () => {
             if (res.success) setVehicles(res.data);
         } catch (err) { setError('Failed to load vehicles'); }
         finally { setLoading(false); }
+    };
+
+    const loadOwners = async () => {
+        try {
+            const res = await ownerAPI.getAll();
+            if (res.success) setOwners(res.data || []);
+        } catch (err) {
+            setOwners([]);
+        }
     };
 
     // NEW: Handle Bulk Import
@@ -225,11 +243,6 @@ const VehicleList = () => {
                     insurance_base_value: row['Insurance Base Value'] || row['insurance_base_value'] || 0,
                     insurance_amount: row['Insurance Amount'] || row['insurance_amount'] || 0,
                     gst_percent: row['GST %'] || row['gst_percent'] || 0,
-                    bank_name: row['Bank Name'] || row['bank_name'] || '',
-                    branch: row['Branch'] || row['branch'] || '',
-                    account_number: row['Account Number'] || row['account_number'] || row['Account No'] || '',
-                    ifsc_code: row['IFSC'] || row['ifsc_code'] || '',
-
                     status: 'Active'
                 };
 
@@ -272,11 +285,7 @@ const VehicleList = () => {
         if (vehicle) {
             const normalizedVehicle = {
                 ...vehicle,
-                vehicle_financial_status: vehicle.vehicle_financial_status || 'Free',
-                bank_name: vehicle.bank_name || '',
-                branch: vehicle.branch || '',
-                account_number: vehicle.account_number || '',
-                ifsc_code: vehicle.ifsc_code || ''
+                vehicle_financial_status: vehicle.vehicle_financial_status || 'Free'
             };
             setFormData({
                 vehicle_no: '',
@@ -307,10 +316,6 @@ const VehicleList = () => {
                 fc_from_date: '',
                 fc_till_date: '',
                 fc_document: null,
-                bank_name: '',
-                branch: '',
-                account_number: '',
-                ifsc_code: '',
                 status: 'Active',
                 ...normalizedVehicle
             });
@@ -344,10 +349,6 @@ const VehicleList = () => {
                 fc_from_date: '',
                 fc_till_date: '',
                 fc_document: null,
-                bank_name: '',
-                branch: '',
-                account_number: '',
-                ifsc_code: '',
                 status: 'Active'
             });
         }
@@ -655,7 +656,7 @@ const VehicleList = () => {
                                             <SelectValue placeholder="Select Owner" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {(ownersMap[formData.own_dedicated] || []).map(owner => <SelectItem key={owner} value={owner}>{owner}</SelectItem>)}
+                                            {ownerOptions.map(owner => <SelectItem key={owner} value={owner}>{owner}</SelectItem>)}
                                         </SelectContent>
                                     </Select>
                                     {formErrors.owner_name && <p className="text-[10px] text-red-500">{formErrors.owner_name}</p>}
@@ -811,35 +812,6 @@ const VehicleList = () => {
                                 <Button type="button" variant="outline" size="sm" className="flex items-center gap-2">
                                     <Upload className="w-3 h-3" /> Upload Policy Document
                                 </Button>
-                            </div>
-                        </div>
-
-                        <Separator />
-
-                        {/* Section: Bank Details */}
-                        <div className="space-y-4">
-                            <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                                <ClipboardList className="w-4 h-4" /> Bank Details (Optional)
-                            </h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="bank_name">Bank Name</Label>
-                                    <Input id="bank_name" value={formData.bank_name || ''} onChange={e => setFormData({ ...formData, bank_name: e.target.value })} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="branch">Branch</Label>
-                                    <Input id="branch" value={formData.branch || ''} onChange={e => setFormData({ ...formData, branch: e.target.value })} />
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="account_number">Account Number</Label>
-                                    <Input id="account_number" value={formData.account_number || ''} onChange={e => setFormData({ ...formData, account_number: e.target.value })} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="ifsc_code">IFSC Code</Label>
-                                    <Input id="ifsc_code" value={formData.ifsc_code || ''} onChange={e => setFormData({ ...formData, ifsc_code: e.target.value.toUpperCase() })} className="font-mono uppercase" />
-                                </div>
                             </div>
                         </div>
 

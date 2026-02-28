@@ -39,12 +39,8 @@ BEGIN
 END;
 $$;
 
--- Vehicle Master: new financial status + bank fields
+-- Vehicle Master: new financial status
 ALTER TABLE IF EXISTS vehicles ADD COLUMN IF NOT EXISTS vehicle_financial_status VARCHAR(20) DEFAULT 'Free';
-ALTER TABLE IF EXISTS vehicles ADD COLUMN IF NOT EXISTS bank_name VARCHAR(255);
-ALTER TABLE IF EXISTS vehicles ADD COLUMN IF NOT EXISTS branch VARCHAR(255);
-ALTER TABLE IF EXISTS vehicles ADD COLUMN IF NOT EXISTS account_number VARCHAR(30);
-ALTER TABLE IF EXISTS vehicles ADD COLUMN IF NOT EXISTS ifsc_code VARCHAR(20);
 
 UPDATE vehicles
 SET vehicle_financial_status = 'Free'
@@ -57,7 +53,7 @@ ALTER TABLE IF EXISTS vehicles DROP CONSTRAINT IF EXISTS vehicles_financial_stat
 ALTER TABLE IF EXISTS vehicles
     ADD CONSTRAINT vehicles_financial_status_check CHECK (vehicle_financial_status IN ('Free', 'Loan'));
 
--- Vehicle Master: compliance, technical, and bank fields are optional
+-- Vehicle Master: compliance and technical fields are optional
 DO $$
 DECLARE
     optional_col TEXT;
@@ -72,11 +68,7 @@ BEGIN
         'permit_till_date',
         'fc_no',
         'fc_from_date',
-        'fc_till_date',
-        'bank_name',
-        'branch',
-        'account_number',
-        'ifsc_code'
+        'fc_till_date'
     ]
     LOOP
         IF EXISTS (

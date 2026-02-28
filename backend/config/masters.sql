@@ -96,10 +96,6 @@ ALTER TABLE IF EXISTS vehicles DROP COLUMN IF EXISTS rc_document;
 
 -- Vehicle Master enhancements
 ALTER TABLE IF EXISTS vehicles ADD COLUMN IF NOT EXISTS vehicle_financial_status VARCHAR(20) DEFAULT 'Free';
-ALTER TABLE IF EXISTS vehicles ADD COLUMN IF NOT EXISTS bank_name VARCHAR(255);
-ALTER TABLE IF EXISTS vehicles ADD COLUMN IF NOT EXISTS branch VARCHAR(255);
-ALTER TABLE IF EXISTS vehicles ADD COLUMN IF NOT EXISTS account_number VARCHAR(30);
-ALTER TABLE IF EXISTS vehicles ADD COLUMN IF NOT EXISTS ifsc_code VARCHAR(20);
 
 UPDATE vehicles
 SET vehicle_financial_status = 'Free'
@@ -127,11 +123,7 @@ BEGIN
         'permit_till_date',
         'fc_no',
         'fc_from_date',
-        'fc_till_date',
-        'bank_name',
-        'branch',
-        'account_number',
-        'ifsc_code'
+        'fc_till_date'
     ]
     LOOP
         IF EXISTS (

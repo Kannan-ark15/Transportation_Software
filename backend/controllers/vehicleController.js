@@ -23,8 +23,7 @@ const createVehicle = async (req, res, next) => {
             'own_dedicated', 'owner_name', 'vehicle_financial_status', 'recommended_km', 'engine_no', 'chasis_no',
             'pollution_no', 'pollution_expiry_date', 'permit_no', 'permit_from_date',
             'permit_till_date', 'insurance_no', 'insurance_base_value', 'gst_percent', 'gst_value',
-            'insurance_amount', 'fc_no', 'fc_from_date', 'fc_till_date',
-            'bank_name', 'branch', 'account_number', 'ifsc_code', 'status'
+            'insurance_amount', 'fc_no', 'fc_from_date', 'fc_till_date', 'status'
         ];
 
         // Fix: Use ternary to allow 0 or false, only default to null if undefined/null/empty string
@@ -50,8 +49,7 @@ const updateVehicle = async (req, res, next) => {
             'own_dedicated', 'owner_name', 'vehicle_financial_status', 'recommended_km', 'engine_no', 'chasis_no',
             'pollution_no', 'pollution_expiry_date', 'permit_no', 'permit_from_date',
             'permit_till_date', 'insurance_no', 'insurance_base_value', 'gst_percent', 'gst_value',
-            'insurance_amount', 'fc_no', 'fc_from_date', 'fc_till_date',
-            'bank_name', 'branch', 'account_number', 'ifsc_code', 'status'
+            'insurance_amount', 'fc_no', 'fc_from_date', 'fc_till_date', 'status'
         ];
 
         const updates = fields.map((field, i) => `${field} = $${i + 2}`).join(', ');
