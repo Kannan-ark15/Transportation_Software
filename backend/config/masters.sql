@@ -65,7 +65,26 @@ CREATE TABLE IF NOT EXISTS places (
     UNIQUE(to_place, product_id) -- Unique Place + Product Combination as per rules
 );
 
--- 4A. PLACE RATE CHART MAPPING (Place <-> Rate Cards)
+-- 4A. RATE CARDS MASTER (defines vehicle type rates for place routes)
+CREATE TABLE IF NOT EXISTS rate_cards (
+    id SERIAL PRIMARY KEY,
+    vehicle_type VARCHAR(100),
+    vehicle_sub_type VARCHAR(100),
+    vehicle_body_type VARCHAR(100),
+    rcl_freight DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    kt_freight DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    driver_bata DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    advance DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    unloading DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    tarpaulin DECIMAL(10, 2),
+    city_tax DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    maintenance DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(vehicle_type, vehicle_sub_type, vehicle_body_type) -- Unique vehicle configuration
+);
+
+-- 4B. PLACE RATE CHART MAPPING (Place <-> Rate Cards)
 CREATE TABLE IF NOT EXISTS place_rate_cards (
     id SERIAL PRIMARY KEY,
     place_id INTEGER REFERENCES places(id) ON DELETE CASCADE,
