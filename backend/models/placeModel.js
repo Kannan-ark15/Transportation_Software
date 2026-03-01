@@ -67,7 +67,7 @@ class PlaceModel {
 
                 // Check if rate card with same vehicle configuration exists
                 const existingCheck = await client.query(
-                    'SELECT * FROM rate_cards WHERE vehicle_type = $1 AND vehicle_sub_type = $2 AND vehicle_body_type = $3',
+                    'SELECT * FROM rate_cards WHERE vehicle_type IS NOT DISTINCT FROM $1 AND vehicle_sub_type IS NOT DISTINCT FROM $2 AND vehicle_body_type IS NOT DISTINCT FROM $3',
                     [normalized.vehicle_type, normalized.vehicle_sub_type, normalized.vehicle_body_type]
                 );
 
@@ -221,7 +221,7 @@ class PlaceModel {
 
                 // Check if rate card with same vehicle configuration exists
                 const existingCheck = await client.query(
-                    'SELECT * FROM rate_cards WHERE vehicle_type = $1 AND vehicle_sub_type = $2 AND vehicle_body_type = $3',
+                    'SELECT * FROM rate_cards WHERE vehicle_type IS NOT DISTINCT FROM $1 AND vehicle_sub_type IS NOT DISTINCT FROM $2 AND vehicle_body_type IS NOT DISTINCT FROM $3',
                     [normalized.vehicle_type, normalized.vehicle_sub_type, normalized.vehicle_body_type]
                 );
 
