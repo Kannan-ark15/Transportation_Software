@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { loanMasterAPI } from '../services/api';
 import Pagination from './Pagination';
 import {
@@ -10,7 +10,9 @@ import {
     Loader2,
     Landmark,
     CalendarClock,
-    Calculator
+    Calculator,
+    UploadCloud,
+    FileCheck2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -144,6 +146,27 @@ const toNumber = (value, fallback = 0) => {
     return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const formatINR = (value) => {
+    const n = toNumber(value, 0);
+    return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+// ─── PDF Parsing Helpers ───────────────────────────────────────────────────────
+
+/**
+ * Send PDF to the backend for server-side OCR parsing.
+ * Returns { agreementNumber, loanType, loanAmount, tenure, totalInstallments, frequency, scheduleRows }
+ */
+const parseHDFCRepaymentPDF = async (file) => {
+    // loanMasterAPI.parsePdf() handles FormData wrapping + multipart headers internally.
+    // It returns already-parsed response.data (axios), not a raw fetch Response.
+    const data = await loanMasterAPI.parsePdf(file);
+    if (!data.success) {
+        throw new Error(data.message || 'Failed to parse PDF');
+    }
+    return data.data;
+};
+
 const LoanMaster = () => {
     const [loans, setLoans] = useState([]);
     const [banks, setBanks] = useState([]);
@@ -163,6 +186,10 @@ const LoanMaster = () => {
     const [formData, setFormData] = useState(emptyForm);
     const [schedules, setSchedules] = useState([]);
     const [formErrors, setFormErrors] = useState({});
+    const [pdfParsing, setPdfParsing] = useState(false);
+    const [pdfFileName, setPdfFileName] = useState('');
+    const [pdfError, setPdfError] = useState('');
+    const pdfInputRef = useRef(null);
 
     const buildScheduleRows = (nextForm, existingRows = [], forceDateRecalc = false) => {
         const count = Math.max(0, Number(nextForm.total_installments) || 0);
@@ -219,15 +246,24 @@ const LoanMaster = () => {
         const rows = schedules.map((row, idx) => {
             const principal = Number(toNumber(row.principal, 0).toFixed(2));
             const interest = Number(toNumber(row.interest, 0).toFixed(2));
-            const dueAmount = Number((principal + interest).toFixed(2));
-            runningOutstanding = Number((runningOutstanding - principal).toFixed(2));
-            const outstandingPrincipal = runningOutstanding < 0 ? 0 : runningOutstanding;
+            // Use due_amount from PDF if available, else calculate
+            const dueAmount = row.due_amount != null
+                ? Number(toNumber(row.due_amount, 0).toFixed(2))
+                : Number((principal + interest).toFixed(2));
+            // Use outstanding_principal from PDF if available (avoids floating point drift)
+            let outstandingPrincipal;
+            if (row.outstanding_principal != null) {
+                outstandingPrincipal = Number(toNumber(row.outstanding_principal, 0).toFixed(2));
+            } else {
+                runningOutstanding = Number((runningOutstanding - principal).toFixed(2));
+                outstandingPrincipal = runningOutstanding < 0 ? 0 : runningOutstanding;
+            }
             totalDue += dueAmount;
             return {
                 ...row,
                 installment_number: idx + 1,
                 due_amount: dueAmount,
-                outstanding_principal: Number(outstandingPrincipal.toFixed(2))
+                outstanding_principal: outstandingPrincipal
             };
         });
 
@@ -253,6 +289,8 @@ const LoanMaster = () => {
         setSelectedLoan(loan);
         setFormErrors({});
         setError('');
+        setPdfFileName('');
+        setPdfError('');
 
         if (!loan || mode === 'add') {
             setFormData(emptyForm);
@@ -315,6 +353,48 @@ const LoanMaster = () => {
         setSchedules((prev) =>
             prev.map((row, i) => (i === idx ? { ...row, [field]: value } : row))
         );
+    };
+
+
+    const handlePdfUpload = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (file.type !== 'application/pdf') {
+            setPdfError('Please upload a valid PDF file.');
+            return;
+        }
+
+        setPdfParsing(true);
+        setPdfError('');
+        setPdfFileName(file.name);
+
+        try {
+            const parsed = await parseHDFCRepaymentPDF(file);
+
+            if (!parsed.scheduleRows.length) {
+                setPdfError('No schedule rows found in PDF. Please check the file format.');
+                setPdfParsing(false);
+                return;
+            }
+
+            const nextForm = { ...formData };
+            if (parsed.agreementNumber) nextForm.agreement_number = parsed.agreementNumber;
+            if (parsed.loanType) nextForm.loan_type = parsed.loanType;
+            if (!isNaN(parsed.loanAmount) && parsed.loanAmount > 0) nextForm.loan_amount = String(parsed.loanAmount);
+            if (!isNaN(parsed.tenure) && parsed.tenure > 0) nextForm.tenure = String(parsed.tenure);
+            if (!isNaN(parsed.totalInstallments) && parsed.totalInstallments > 0) nextForm.total_installments = String(parsed.totalInstallments);
+            if (parsed.frequency) nextForm.frequency = parsed.frequency;
+            if (parsed.scheduleRows[0]?.due_date) nextForm.first_due_date = parsed.scheduleRows[0].due_date;
+
+            setFormData(nextForm);
+            setSchedules(parsed.scheduleRows);
+        } catch (err) {
+            console.error('PDF parse error:', err);
+            setPdfError('Failed to parse PDF. Please check the file format.');
+        } finally {
+            setPdfParsing(false);
+            if (pdfInputRef.current) pdfInputRef.current.value = '';
+        }
     };
 
     const validate = () => {
@@ -710,9 +790,49 @@ const LoanMaster = () => {
                             <Separator />
 
                             <div className="space-y-4">
-                                <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                                    <CalendarClock className="w-4 h-4" /> Loan Schedule Details
-                                </h4>
+                                <div className="flex items-center justify-between flex-wrap gap-2">
+                                    <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                                        <CalendarClock className="w-4 h-4" /> Loan Schedule Details
+                                    </h4>
+                                    {modalMode !== 'view' && (
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                ref={pdfInputRef}
+                                                type="file"
+                                                accept="application/pdf"
+                                                className="hidden"
+                                                onChange={handlePdfUpload}
+                                                id="loan-pdf-upload"
+                                            />
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                disabled={pdfParsing}
+                                                onClick={() => pdfInputRef.current?.click()}
+                                                className="flex items-center gap-1.5 text-blue-600 border-blue-200 hover:bg-blue-50 hover:border-blue-400"
+                                            >
+                                                {pdfParsing ? (
+                                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                                ) : (
+                                                    <UploadCloud className="w-4 h-4" />
+                                                )}
+                                                {pdfParsing ? 'Parsing PDF...' : 'Import from PDF'}
+                                            </Button>
+                                            {pdfFileName && !pdfParsing && (
+                                                <span className="flex items-center gap-1 text-xs text-green-600">
+                                                    <FileCheck2 className="w-3.5 h-3.5" />
+                                                    {pdfFileName}
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                                {pdfError && (
+                                    <div className="p-2 text-xs text-red-600 bg-red-50 border border-red-100 rounded-md">
+                                        {pdfError}
+                                    </div>
+                                )}
                                 {formErrors.schedules && (
                                     <div className="p-2 text-xs text-red-600 bg-red-50 border border-red-100 rounded-md">
                                         {formErrors.schedules}
@@ -770,10 +890,10 @@ const LoanMaster = () => {
                                                             />
                                                         </TableCell>
                                                         <TableCell>
-                                                            <Input disabled value={Number(toNumber(row.due_amount, 0)).toFixed(2)} className="bg-slate-50" />
+                                                            <Input disabled value={formatINR(row.due_amount)} className="bg-slate-50" />
                                                         </TableCell>
                                                         <TableCell>
-                                                            <Input disabled value={Number(toNumber(row.outstanding_principal, 0)).toFixed(2)} className="bg-slate-50" />
+                                                            <Input disabled value={formatINR(row.outstanding_principal)} className="bg-slate-50" />
                                                         </TableCell>
                                                     </TableRow>
                                                 ))
@@ -793,7 +913,7 @@ const LoanMaster = () => {
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div className="space-y-1">
                                     <Label>Total Due</Label>
-                                    <Input disabled className="bg-slate-50 font-semibold" value={computedSchedules.totalDue.toFixed(2)} />
+                                    <Input disabled className="bg-slate-50 font-semibold" value={formatINR(computedSchedules.totalDue)} />
                                 </div>
                                 <div className="space-y-1">
                                     <Label>Total Installments</Label>

@@ -495,11 +495,131 @@ const deleteLoanMaster = async (req, res, next) => {
     }
 };
 
+
+
+const parseLoanPDF = async (req, res, next) => {
+    if (!req.file) {
+        return res.status(400).json({ success: false, message: 'No PDF file uploaded' });
+    }
+
+    try {
+        // ── Dynamically require pdfjs-dist and tesseract.js (pure Node, no system tools) ──
+        const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
+        const { createCanvas } = require('canvas');
+        const Tesseract = require('tesseract.js');
+
+        // Disable worker for Node.js environment
+        pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+
+        const pdfBuffer = req.file.buffer;
+        const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(pdfBuffer), useWorkerFetch: false, isEvalSupported: false, useSystemFonts: true });
+        const pdfDoc = await loadingTask.promise;
+
+        let fullText = '';
+
+        for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+            const page = await pdfDoc.getPage(pageNum);
+            const scale = 3.5; // high DPI for accurate OCR
+            const viewport = page.getViewport({ scale });
+
+            const canvas = createCanvas(viewport.width, viewport.height);
+            const ctx = canvas.getContext('2d');
+
+            await page.render({ canvasContext: ctx, viewport }).promise;
+
+            const { data: { text } } = await Tesseract.recognize(canvas.toBuffer('image/png'), 'eng', {
+                tessedit_pageseg_mode: '6',
+                logger: () => { }
+            });
+
+            fullText += text + '\n';
+        }
+
+        // ── Parse header fields ──────────────────────────────────────────────
+        const parseIndianNumber = (str) => {
+            if (!str) return null;
+            const n = Number(String(str).replace(/,/g, '').trim());
+            return isNaN(n) ? null : n;
+        };
+
+        const agreementMatch = fullText.match(/Agreement\s*No[.\s:]*([0-9]+)/i);
+        const agreementNumber = agreementMatch ? agreementMatch[1] : '';
+
+        const loanTypeMatch = fullText.match(/Loan\s*Type\s+([\w\s/()-]+?)(?=Tenure|Amount\s*Financed|Frequency|Currency|\n)/i);
+        const rawLoanType = loanTypeMatch ? loanTypeMatch[1].replace(/\s+/g, ' ').trim() : '';
+        const normLoanType = (() => {
+            const u = rawLoanType.toUpperCase();
+            if (u.includes('COMMERCIAL VEHICLE')) return 'Commercial Vehicle Loan';
+            if (u.includes('TRACTOR')) return 'Tractor Loan';
+            if (u.includes('MACHINERY')) return 'Machinery Loan';
+            if (u.includes('EQUIPMENT')) return 'Construction Equipment Loan';
+            return rawLoanType || '';
+        })();
+
+        const amountMatch = fullText.match(/Amount\s*Financed\s+([\d,]+\.?\d*)/i);
+        const loanAmount = amountMatch ? parseIndianNumber(amountMatch[1]) : null;
+
+        const tenureMatch = fullText.match(/Tenure[.\s:]*(\d+)/i);
+        const tenure = tenureMatch ? Number(tenureMatch[1]) : null;
+
+        const totalInstMatch = fullText.match(/Total\s*Inst[l1][.\s:]*(\d+)/i);
+        const totalInstallments = totalInstMatch ? Number(totalInstMatch[1]) : null;
+
+        const freqMatch = fullText.match(/Frequency\s+(Monthly|Quarterly|Half-Yearly|Yearly|Weekly|Fortnightly)/i);
+        const frequency = freqMatch
+            ? freqMatch[1].charAt(0).toUpperCase() + freqMatch[1].slice(1).toLowerCase()
+            : 'Monthly';
+
+        // ── Parse schedule rows ──────────────────────────────────────────────
+        const rowRegex = /(\d+)\s+(\d{2}[/|l]\d{2}[/|l]\d{4})\s+(\d[\d,]*(?:\.\d+)?)\s+(\d[\d,]*(?:\.\d+)?)\s+(\d[\d,]*(?:\.\d+)?)\s+(\d[\d,]*(?:\.\d+)?)/g;
+
+        const scheduleRows = [];
+        let match;
+        while ((match = rowRegex.exec(fullText)) !== null) {
+            const [, instNo, rawDate, rawInstAmt, rawPrincipal, rawInterest, rawOsPrincipal] = match;
+            const cleanDate = rawDate.replace(/[|l]/g, '/');
+            const [mm, dd, yyyy] = cleanDate.split('/');
+            if (!mm || !dd || !yyyy || yyyy.length !== 4) continue;
+            const dueDate = `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
+            const principal = parseIndianNumber(rawPrincipal);
+            const interest = parseIndianNumber(rawInterest);
+            scheduleRows.push({
+                installment_number: Number(instNo),
+                due_date: dueDate,
+                principal,
+                interest,
+                due_amount: parseIndianNumber(rawInstAmt),
+                outstanding_principal: parseIndianNumber(rawOsPrincipal)
+            });
+        }
+
+        if (scheduleRows.length === 0) {
+            return res.status(422).json({ success: false, message: 'No schedule rows found in PDF. Please check the file format.' });
+        }
+
+        res.json({
+            success: true,
+            data: {
+                agreementNumber,
+                loanType: normLoanType,
+                loanAmount,
+                tenure,
+                totalInstallments,
+                frequency,
+                scheduleRows
+            }
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
 module.exports = {
     getLoanMasterMeta,
     getAllLoanMasters,
     getLoanMasterById,
     createLoanMaster,
     updateLoanMaster,
-    deleteLoanMaster
+    deleteLoanMaster,
+    parseLoanPDF
 };

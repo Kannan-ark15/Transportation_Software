@@ -85,6 +85,14 @@ export const loanMasterAPI = {
     getMeta: async () => {
         const response = await api.get('/loan-masters/meta');
         return response.data;
+    },
+    parsePdf: async (file) => {
+        const formData = new FormData();
+        formData.append('pdf', file);
+        const response = await api.post('/loan-masters/parse-pdf', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        return response.data;
     }
 };
 
