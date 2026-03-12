@@ -52,12 +52,16 @@ import {
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { cn } from '@/lib/utils';
+import { showAlert, showConfirm } from '@/lib/dialogService';
 
 const OwnerList = () => {
     const [owners, setOwners] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [successMsg, setSuccessMsg] = useState('');
+
+    const [searchOwnerType, setSearchOwnerType] = useState('');
+    const [searchOwnerName, setSearchOwnerName] = useState('');
 
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -121,7 +125,12 @@ const OwnerList = () => {
             }
 
             setSuccessMsg(`Imported ${successCount} owners successfully.`);
-            if (errors.length > 0) alert(`Failed to import: ${errors.join(', ')}`);
+            if (errors.length > 0) {
+                showAlert({
+                    title: 'Import Failed',
+                    message: `Failed to import: ${errors.join(', ')}`,
+                });
+            }
             loadOwners();
         } catch (err) {
             setError('Import failed');
@@ -210,7 +219,12 @@ const OwnerList = () => {
     };
 
     const handleDelete = async (id, name) => {
-        if (!window.confirm(`Are you sure you want to delete owner "${name}"?`)) return;
+        const ok = await showConfirm({
+            title: 'Delete Owner',
+            message: `Are you sure you want to delete owner "${name}"?`,
+            confirmLabel: 'Delete',
+        });
+        if (!ok) return;
         try {
             const res = await ownerAPI.delete(id);
             if (res.success) {
@@ -221,8 +235,14 @@ const OwnerList = () => {
         } catch (err) { setError('Failed to delete owner'); }
     };
 
+    const filteredOwners = owners.filter(o => {
+        const typeMatch = !searchOwnerType || o.owner_type === searchOwnerType;
+        const nameMatch = !searchOwnerName || o.owner_name.toLowerCase().includes(searchOwnerName.toLowerCase());
+        return typeMatch && nameMatch;
+    });
+
     const startIndex = (currentPage - 1) * itemsPerPage;
-    const paginatedItems = owners.slice(startIndex, startIndex + itemsPerPage);
+    const paginatedItems = filteredOwners.slice(startIndex, startIndex + itemsPerPage);
 
     if (loading) {
         return (
@@ -263,6 +283,41 @@ const OwnerList = () => {
                 </CardHeader>
 
                 <CardContent className="pt-6">
+                    {/* Search Bar */}
+                    <div className="mb-6 flex flex-col sm:flex-row gap-3">
+                        <div className="flex-1">
+                            <Select
+                                value={searchOwnerType}
+                                onValueChange={val => {
+                                    setSearchOwnerType(val === 'all' ? '' : val);
+                                    setCurrentPage(1);
+                                }}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Filter by Owner Type..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Types</SelectItem>
+                                    <SelectItem value="Own">Own</SelectItem>
+                                    <SelectItem value="Dedicated">Dedicated</SelectItem>
+                                    <SelectItem value="Market">Market</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="relative flex-1">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                            <Input
+                                placeholder="Search by Owner Name..."
+                                value={searchOwnerName}
+                                onChange={e => {
+                                    setSearchOwnerName(e.target.value);
+                                    setCurrentPage(1);
+                                }}
+                                className="pl-9"
+                            />
+                        </div>
+                    </div>
+
                     {error && (
                         <div className="mb-4 p-4 bg-red-50 border border-red-100 text-red-600 rounded-lg text-sm font-medium">
                             {error}
@@ -274,7 +329,7 @@ const OwnerList = () => {
                         </div>
                     )}
 
-                    {owners.length === 0 ? (
+                    {filteredOwners.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-12 text-slate-400">
                             <div className="bg-slate-50 p-6 rounded-full mb-4">
                                 <SearchX className="w-12 h-12 text-slate-300" />
@@ -361,7 +416,7 @@ const OwnerList = () => {
                             <div className="mt-4">
                                 <Pagination
                                     currentPage={currentPage}
-                                    totalItems={owners.length}
+                                    totalItems={filteredOwners.length}
                                     itemsPerPage={itemsPerPage}
                                     onPageChange={setCurrentPage}
                                     onItemsPerPageChange={setItemsPerPage}
@@ -383,163 +438,163 @@ const OwnerList = () => {
 
                     <form onSubmit={handleSubmit} className="space-y-8 py-4 px-1">
                         <fieldset disabled={modalMode === 'view'} className="space-y-8">
-                        <div className="space-y-4">
-                            <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                                <UserCircle className="w-4 h-4" /> Owner Information
-                            </h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label className="required">Owner Type</Label>
-                                    <Select value={formData.owner_type} onValueChange={val => setFormData({ ...formData, owner_type: val })}>
-                                        <SelectTrigger className={cn(formErrors.owner_type && "border-red-500")}>
-                                            <SelectValue placeholder="Select Type" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="Own">Own</SelectItem>
-                                            <SelectItem value="Dedicated">Dedicated</SelectItem>
-                                            <SelectItem value="Market">Market</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    {formErrors.owner_type && <p className="text-[10px] text-red-500">{formErrors.owner_type}</p>}
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="owner_name" className="required">Owner Name</Label>
-                                    <Input
-                                        id="owner_name"
-                                        value={formData.owner_name}
-                                        onChange={e => setFormData({ ...formData, owner_name: e.target.value })}
-                                        placeholder="Enter full name"
-                                        className={cn(formErrors.owner_name && "border-red-500")}
-                                    />
-                                    {formErrors.owner_name && <p className="text-[10px] text-red-500">{formErrors.owner_name}</p>}
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="pan_no" className="required">PAN Number</Label>
-                                    <Input
-                                        id="pan_no"
-                                        value={formData.pan_no}
-                                        onChange={e => setFormData({ ...formData, pan_no: e.target.value.toUpperCase() })}
-                                        placeholder="ABCDE1234F"
-                                        maxLength={10}
-                                        className={cn("font-mono", formErrors.pan_no && "border-red-500")}
-                                    />
-                                    {formErrors.pan_no && <p className="text-[10px] text-red-500">{formErrors.pan_no}</p>}
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="aadhar_no" className="required">Aadhar Number</Label>
-                                    <Input
-                                        id="aadhar_no"
-                                        value={formData.aadhar_no}
-                                        onChange={e => setFormData({ ...formData, aadhar_no: e.target.value })}
-                                        placeholder="12 digit number"
-                                        maxLength={12}
-                                        className={cn("font-mono", formErrors.aadhar_no && "border-red-500")}
-                                    />
-                                    {formErrors.aadhar_no && <p className="text-[10px] text-red-500">{formErrors.aadhar_no}</p>}
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="gst_no">GST Number (Optional)</Label>
-                                    <Input
-                                        id="gst_no"
-                                        value={formData.gst_no}
-                                        onChange={e => setFormData({ ...formData, gst_no: e.target.value.toUpperCase() })}
-                                        placeholder="15 digit GST"
-                                        maxLength={15}
-                                        className={cn("font-mono", formErrors.gst_no && "border-red-500")}
-                                    />
-                                    {formErrors.gst_no && <p className="text-[10px] text-red-500">{formErrors.gst_no}</p>}
-                                </div>
-                            </div>
-                        </div>
-
-                        <Separator />
-
-                        <div className="space-y-4">
-                            <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                                <MapPin className="w-4 h-4" /> Contact & Address
-                            </h4>
                             <div className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="company_address" className="required">Company Address</Label>
-                                    <Textarea
-                                        id="company_address"
-                                        value={formData.company_address}
-                                        onChange={e => setFormData({ ...formData, company_address: e.target.value })}
-                                        className={cn("min-h-[80px]", formErrors.company_address && "border-red-500")}
-                                    />
-                                    {formErrors.company_address && <p className="text-[10px] text-red-500">{formErrors.company_address}</p>}
+                                <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                                    <UserCircle className="w-4 h-4" /> Owner Information
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label className="required">Owner Type</Label>
+                                        <Select value={formData.owner_type} onValueChange={val => setFormData({ ...formData, owner_type: val })}>
+                                            <SelectTrigger className={cn(formErrors.owner_type && "border-red-500")}>
+                                                <SelectValue placeholder="Select Type" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="Own">Own</SelectItem>
+                                                <SelectItem value="Dedicated">Dedicated</SelectItem>
+                                                <SelectItem value="Market">Market</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        {formErrors.owner_type && <p className="text-[10px] text-red-500">{formErrors.owner_type}</p>}
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="owner_name" className="required">Owner Name</Label>
+                                        <Input
+                                            id="owner_name"
+                                            value={formData.owner_name}
+                                            onChange={e => setFormData({ ...formData, owner_name: e.target.value })}
+                                            placeholder="Enter full name"
+                                            className={cn(formErrors.owner_name && "border-red-500")}
+                                        />
+                                        {formErrors.owner_name && <p className="text-[10px] text-red-500">{formErrors.owner_name}</p>}
+                                    </div>
                                 </div>
+
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="place" className="required">Place / City</Label>
-                                        <Input id="place" value={formData.place} onChange={e => setFormData({ ...formData, place: e.target.value })} />
-                                        {formErrors.place && <p className="text-[10px] text-red-500">{formErrors.place}</p>}
+                                        <Label htmlFor="pan_no" className="required">PAN Number</Label>
+                                        <Input
+                                            id="pan_no"
+                                            value={formData.pan_no}
+                                            onChange={e => setFormData({ ...formData, pan_no: e.target.value.toUpperCase() })}
+                                            placeholder="ABCDE1234F"
+                                            maxLength={10}
+                                            className={cn("font-mono", formErrors.pan_no && "border-red-500")}
+                                        />
+                                        {formErrors.pan_no && <p className="text-[10px] text-red-500">{formErrors.pan_no}</p>}
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="contact_no" className="required">Contact Number</Label>
-                                        <Input id="contact_no" value={formData.contact_no} onChange={e => setFormData({ ...formData, contact_no: e.target.value })} maxLength={10} />
-                                        {formErrors.contact_no && <p className="text-[10px] text-red-500">{formErrors.contact_no}</p>}
+                                        <Label htmlFor="aadhar_no" className="required">Aadhar Number</Label>
+                                        <Input
+                                            id="aadhar_no"
+                                            value={formData.aadhar_no}
+                                            onChange={e => setFormData({ ...formData, aadhar_no: e.target.value })}
+                                            placeholder="12 digit number"
+                                            maxLength={12}
+                                            className={cn("font-mono", formErrors.aadhar_no && "border-red-500")}
+                                        />
+                                        {formErrors.aadhar_no && <p className="text-[10px] text-red-500">{formErrors.aadhar_no}</p>}
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="email_id">Email Address</Label>
-                                        <Input id="email_id" type="email" value={formData.email_id} onChange={e => setFormData({ ...formData, email_id: e.target.value })} />
+                                        <Label htmlFor="gst_no">GST Number (Optional)</Label>
+                                        <Input
+                                            id="gst_no"
+                                            value={formData.gst_no}
+                                            onChange={e => setFormData({ ...formData, gst_no: e.target.value.toUpperCase() })}
+                                            placeholder="15 digit GST"
+                                            maxLength={15}
+                                            className={cn("font-mono", formErrors.gst_no && "border-red-500")}
+                                        />
+                                        {formErrors.gst_no && <p className="text-[10px] text-red-500">{formErrors.gst_no}</p>}
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <Separator />
+                            <Separator />
 
-                        <div className="space-y-4">
-                            <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                                <CreditCard className="w-4 h-4" /> Bank Account Details
-                            </h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="bank_name" className="required">Bank Name</Label>
-                                    <Input id="bank_name" value={formData.bank_name} onChange={e => setFormData({ ...formData, bank_name: e.target.value })} />
-                                    {formErrors.bank_name && <p className="text-[10px] text-red-500">{formErrors.bank_name}</p>}
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="branch" className="required">Branch</Label>
-                                    <Input id="branch" value={formData.branch} onChange={e => setFormData({ ...formData, branch: e.target.value })} />
-                                    {formErrors.branch && <p className="text-[10px] text-red-500">{formErrors.branch}</p>}
+                            <div className="space-y-4">
+                                <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                                    <MapPin className="w-4 h-4" /> Contact & Address
+                                </h4>
+                                <div className="space-y-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="company_address" className="required">Company Address</Label>
+                                        <Textarea
+                                            id="company_address"
+                                            value={formData.company_address}
+                                            onChange={e => setFormData({ ...formData, company_address: e.target.value })}
+                                            className={cn("min-h-[80px]", formErrors.company_address && "border-red-500")}
+                                        />
+                                        {formErrors.company_address && <p className="text-[10px] text-red-500">{formErrors.company_address}</p>}
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="place" className="required">Place / City</Label>
+                                            <Input id="place" value={formData.place} onChange={e => setFormData({ ...formData, place: e.target.value })} />
+                                            {formErrors.place && <p className="text-[10px] text-red-500">{formErrors.place}</p>}
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="contact_no" className="required">Contact Number</Label>
+                                            <Input id="contact_no" value={formData.contact_no} onChange={e => setFormData({ ...formData, contact_no: e.target.value })} maxLength={10} />
+                                            {formErrors.contact_no && <p className="text-[10px] text-red-500">{formErrors.contact_no}</p>}
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="email_id">Email Address</Label>
+                                            <Input id="email_id" type="email" value={formData.email_id} onChange={e => setFormData({ ...formData, email_id: e.target.value })} />
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="account_no" className="required">Account Number</Label>
-                                    <Input id="account_no" value={formData.account_no} onChange={e => setFormData({ ...formData, account_no: e.target.value })} className="font-mono" />
-                                    {formErrors.account_no && <p className="text-[10px] text-red-500">{formErrors.account_no}</p>}
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="ifsc_code" className="required">IFSC Code</Label>
-                                    <Input id="ifsc_code" value={formData.ifsc_code} onChange={e => setFormData({ ...formData, ifsc_code: e.target.value.toUpperCase() })} className="font-mono" maxLength={11} />
-                                    {formErrors.ifsc_code && <p className="text-[10px] text-red-500">{formErrors.ifsc_code}</p>}
-                                </div>
-                            </div>
-                        </div>
 
-                        <Separator />
+                            <Separator />
 
-                        <div className="flex items-center justify-between pb-4">
-                            <div className="space-y-1">
-                                <Label className="text-base font-bold text-slate-900">Owner Status</Label>
-                                <p className="text-sm text-slate-500">Enable or disable this owner for new operations.</p>
+                            <div className="space-y-4">
+                                <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                                    <CreditCard className="w-4 h-4" /> Bank Account Details
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="bank_name" className="required">Bank Name</Label>
+                                        <Input id="bank_name" value={formData.bank_name} onChange={e => setFormData({ ...formData, bank_name: e.target.value })} />
+                                        {formErrors.bank_name && <p className="text-[10px] text-red-500">{formErrors.bank_name}</p>}
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="branch" className="required">Branch</Label>
+                                        <Input id="branch" value={formData.branch} onChange={e => setFormData({ ...formData, branch: e.target.value })} />
+                                        {formErrors.branch && <p className="text-[10px] text-red-500">{formErrors.branch}</p>}
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="account_no" className="required">Account Number</Label>
+                                        <Input id="account_no" value={formData.account_no} onChange={e => setFormData({ ...formData, account_no: e.target.value })} className="font-mono" />
+                                        {formErrors.account_no && <p className="text-[10px] text-red-500">{formErrors.account_no}</p>}
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="ifsc_code" className="required">IFSC Code</Label>
+                                        <Input id="ifsc_code" value={formData.ifsc_code} onChange={e => setFormData({ ...formData, ifsc_code: e.target.value.toUpperCase() })} className="font-mono" maxLength={11} />
+                                        {formErrors.ifsc_code && <p className="text-[10px] text-red-500">{formErrors.ifsc_code}</p>}
+                                    </div>
+                                </div>
                             </div>
-                            <div className="flex items-center gap-3">
-                                <span className={cn("text-sm font-bold", formData.status === 'Active' ? "text-green-600" : "text-red-600")}>
-                                    {formData.status === 'Active' ? 'ACTIVE' : 'INACTIVE'}
-                                </span>
-                                <Switch
-                                    checked={formData.status === 'Active'}
-                                    onCheckedChange={checked => setFormData({ ...formData, status: checked ? 'Active' : 'Inactive' })}
-                                />
+
+                            <Separator />
+
+                            <div className="flex items-center justify-between pb-4">
+                                <div className="space-y-1">
+                                    <Label className="text-base font-bold text-slate-900">Owner Status</Label>
+                                    <p className="text-sm text-slate-500">Enable or disable this owner for new operations.</p>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <span className={cn("text-sm font-bold", formData.status === 'Active' ? "text-green-600" : "text-red-600")}>
+                                        {formData.status === 'Active' ? 'ACTIVE' : 'INACTIVE'}
+                                    </span>
+                                    <Switch
+                                        checked={formData.status === 'Active'}
+                                        onCheckedChange={checked => setFormData({ ...formData, status: checked ? 'Active' : 'Inactive' })}
+                                    />
+                                </div>
                             </div>
-                        </div>
                         </fieldset>
 
                         <DialogFooter className="pt-8 border-t border-slate-100 flex items-center justify-between">

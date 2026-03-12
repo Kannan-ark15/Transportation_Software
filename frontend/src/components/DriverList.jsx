@@ -52,6 +52,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { cn } from '@/lib/utils';
+import { showAlert, showConfirm } from '@/lib/dialogService';
 
 const DriverList = () => {
     const [drivers, setDrivers] = useState([]);
@@ -133,7 +134,12 @@ const DriverList = () => {
             }
 
             setSuccessMsg(`Imported ${successCount} drivers successfully.`);
-            if (errors.length > 0) alert(`Failed to import: ${errors.join(', ')}`);
+            if (errors.length > 0) {
+                showAlert({
+                    title: 'Import Failed',
+                    message: `Failed to import: ${errors.join(', ')}`,
+                });
+            }
             loadDrivers();
         } catch (err) {
             setError('Import failed');
@@ -198,7 +204,12 @@ const DriverList = () => {
     };
 
     const handleDelete = async (id, name) => {
-        if (!window.confirm(`Are you sure you want to delete driver "${name}"?`)) return;
+        const ok = await showConfirm({
+            title: 'Delete Driver',
+            message: `Are you sure you want to delete driver "${name}"?`,
+            confirmLabel: 'Delete',
+        });
+        if (!ok) return;
         try {
             const res = await driverAPI.delete(id);
             if (res.success) {

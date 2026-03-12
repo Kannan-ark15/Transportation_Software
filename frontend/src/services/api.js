@@ -52,6 +52,10 @@ export const loadingAdvanceAPI = {
     getInvoices: async (id) => {
         const response = await api.get(`/loading-advances/${id}/invoices`);
         return response.data;
+    },
+    delete: async (id, { user_id } = {}) => {
+        const response = await api.delete(`/loading-advances/${id}`, { params: { user_id } });
+        return response.data;
     }
 };
 

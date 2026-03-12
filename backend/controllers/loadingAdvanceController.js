@@ -281,4 +281,21 @@ const createLoadingAdvance = async (req, res, next) => {
     }
 };
 
-module.exports = { getAllLoadingAdvances, getLoadingAdvanceById, createLoadingAdvance, getNextVoucher, getLoadingAdvanceInvoices };
+const deleteLoadingAdvance = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+
+        const result = await pool.query('DELETE FROM loading_advances WHERE id = $1 RETURNING *', [id]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, message: 'Loading advance not found' });
+        }
+        res.status(200).json({ success: true, message: 'Loading advance deleted successfully' });
+    } catch (error) {
+        if (error.code === '23503') {
+            return res.status(400).json({ success: false, message: 'Cannot delete: this record is linked to a settlement. Remove the settlement first.' });
+        }
+        next(error);
+    }
+};
+
+module.exports = { getAllLoadingAdvances, getLoadingAdvanceById, createLoadingAdvance, getNextVoucher, getLoadingAdvanceInvoices, deleteLoadingAdvance };

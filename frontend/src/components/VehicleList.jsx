@@ -52,6 +52,7 @@ import {
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { cn } from '@/lib/utils';
+import { showAlert, showConfirm } from '@/lib/dialogService';
 
 import DataToolbar from './common/DataToolbar';
 
@@ -258,7 +259,12 @@ const VehicleList = () => {
             }
 
             setSuccessMsg(`Imported ${successCount} vehicles successfully.`);
-            if (errors.length > 0) alert(`Failed to import: ${errors.join(', ')}`);
+            if (errors.length > 0) {
+                showAlert({
+                    title: 'Import Failed',
+                    message: `Failed to import: ${errors.join(', ')}`,
+                });
+            }
             loadVehicles();
         } catch (err) {
             setError('Import failed');
@@ -398,7 +404,12 @@ const VehicleList = () => {
     };
 
     const handleDelete = async (id, no) => {
-        if (!window.confirm(`Are you sure you want to delete vehicle "${no}"?`)) return;
+        const ok = await showConfirm({
+            title: 'Delete Vehicle',
+            message: `Are you sure you want to delete vehicle "${no}"?`,
+            confirmLabel: 'Delete',
+        });
+        if (!ok) return;
         try {
             const res = await vehicleAPI.delete(id);
             if (res.success) {

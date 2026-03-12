@@ -42,12 +42,16 @@ import {
     DialogFooter,
 } from "@/components/ui/dialog";
 import { cn } from '@/lib/utils';
+import { showAlert, showConfirm } from '@/lib/dialogService';
 
 const CompanyList = () => {
     const [companies, setCompanies] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [successMsg, setSuccessMsg] = useState('');
+
+    const [searchName, setSearchName] = useState('');
+    const [searchPlace, setSearchPlace] = useState('');
 
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -111,7 +115,12 @@ const CompanyList = () => {
             }
 
             setSuccessMsg(`Imported ${successCount} companies successfully.`);
-            if (errors.length > 0) alert(`Failed to import: ${errors.join(', ')}`);
+            if (errors.length > 0) {
+                showAlert({
+                    title: 'Import Failed',
+                    message: `Failed to import: ${errors.join(', ')}`,
+                });
+            }
             loadCompanies();
         } catch (err) {
             setError('Import failed');
@@ -196,7 +205,12 @@ const CompanyList = () => {
     };
 
     const handleDelete = async (id, name) => {
-        if (!window.confirm(`Are you sure you want to delete company "${name}"?`)) return;
+        const ok = await showConfirm({
+            title: 'Delete Company',
+            message: `Are you sure you want to delete company "${name}"?`,
+            confirmLabel: 'Delete',
+        });
+        if (!ok) return;
         try {
             const res = await companyAPI.delete(id);
             if (res.success) {
@@ -207,8 +221,14 @@ const CompanyList = () => {
         } catch (err) { setError('Failed to delete company'); }
     };
 
+    const filteredCompanies = companies.filter(c => {
+        const nameMatch = !searchName || c.company_name.toLowerCase().includes(searchName.toLowerCase());
+        const placeMatch = !searchPlace || c.place.toLowerCase().includes(searchPlace.toLowerCase());
+        return nameMatch && placeMatch;
+    });
+
     const startIndex = (currentPage - 1) * itemsPerPage;
-    const paginatedItems = companies.slice(startIndex, startIndex + itemsPerPage);
+    const paginatedItems = filteredCompanies.slice(startIndex, startIndex + itemsPerPage);
 
     if (loading) {
         return (
@@ -249,6 +269,33 @@ const CompanyList = () => {
                 </CardHeader>
 
                 <CardContent className="pt-6">
+                    {/* Search Bar */}
+                    <div className="mb-6 flex flex-col sm:flex-row gap-3">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                            <Input
+                                placeholder="Search by Company Name..."
+                                value={searchName}
+                                onChange={e => {
+                                    setSearchName(e.target.value);
+                                    setCurrentPage(1);
+                                }}
+                                className="pl-9"
+                            />
+                        </div>
+                        <div className="relative flex-1">
+                            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                            <Input
+                                placeholder="Search by Place..."
+                                value={searchPlace}
+                                onChange={e => {
+                                    setSearchPlace(e.target.value);
+                                    setCurrentPage(1);
+                                }}
+                                className="pl-9"
+                            />
+                        </div>
+                    </div>
                     {error && (
                         <div className="mb-4 p-4 bg-red-50 border border-red-100 text-red-600 rounded-lg text-sm font-medium">
                             {error}
@@ -260,7 +307,7 @@ const CompanyList = () => {
                         </div>
                     )}
 
-                    {companies.length === 0 ? (
+                    {filteredCompanies.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-12 text-slate-400">
                             <div className="bg-slate-50 p-6 rounded-full mb-4">
                                 <SearchX className="w-12 h-12 text-slate-300" />
@@ -357,7 +404,7 @@ const CompanyList = () => {
                             <div className="mt-4">
                                 <Pagination
                                     currentPage={currentPage}
-                                    totalItems={companies.length}
+                                    totalItems={filteredCompanies.length}
                                     itemsPerPage={itemsPerPage}
                                     onPageChange={setCurrentPage}
                                     onItemsPerPageChange={setItemsPerPage}

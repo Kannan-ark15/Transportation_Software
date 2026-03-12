@@ -16,6 +16,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { parseImportData, exportToExcel, exportToPDF } from '@/lib/fileUtils';
+import { showAlert } from '@/lib/dialogService';
 
 /**
  * Reusable Toolbar for Import/Export operations.
@@ -44,7 +45,10 @@ const DataToolbar = ({ onImport, data, columns, title, fileName }) => {
             }
         } catch (error) {
             console.error("Import Error:", error);
-            alert("Failed to parse file. Please ensure it is a valid Excel or CSV.");
+            showAlert({
+                title: 'Import Failed',
+                message: 'Failed to parse file. Please ensure it is a valid Excel or CSV.',
+            });
         } finally {
             setImporting(false);
             if (fileInputRef.current) fileInputRef.current.value = '';

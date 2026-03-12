@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import { showAlert } from '@/lib/dialogService';
 
 // --- IMPORT FUNCTIONS ---
 
@@ -102,6 +103,9 @@ export const exportToPDF = (title, columns, data, fileName) => {
         doc.save(`${fileName}.pdf`);
     } else {
         console.error("jsPDF-AutoTable plugin not found");
-        alert("PDF Export failed: Plugin missing.");
+        showAlert({
+            title: 'PDF Export Failed',
+            message: 'PDF Export failed: Plugin missing.',
+        });
     }
 };

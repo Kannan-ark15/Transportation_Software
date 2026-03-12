@@ -6,12 +6,20 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Loader2, SearchX } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Loader2, SearchX, Trash2 } from 'lucide-react';
+import { showAlert } from '@/lib/dialogService';
 
 const LoadingAdvanceTable = ({ refreshKey = 0 }) => {
     const navigate = useNavigate();
     const [rows, setRows] = useState([]), [loading, setLoading] = useState(true);
     const [voucherNo, setVoucherNo] = useState(''), [vehicleNo, setVehicleNo] = useState(''), [fromDate, setFromDate] = useState(''), [toDate, setToDate] = useState('');
+    const [deleting, setDeleting] = useState(null);
+    const [confirmOpen, setConfirmOpen] = useState(false);
+    const [pendingDelete, setPendingDelete] = useState(null);
+
+    const authUser = (() => { try { return JSON.parse(localStorage.getItem('auth_user') || '{}'); } catch { return {}; } })();
+
     useEffect(() => {
         const load = async () => {
             try { setLoading(true); const res = await loadingAdvanceAPI.getAll(); if (res.success) setRows(res.data); }
@@ -19,6 +27,36 @@ const LoadingAdvanceTable = ({ refreshKey = 0 }) => {
         };
         load();
     }, [refreshKey]);
+
+    const handleDelete = async (id, voucherNumber) => {
+        try {
+            setDeleting(id);
+            const res = await loadingAdvanceAPI.delete(id, { user_id: authUser.id });
+            if (res.success) {
+                setRows(prev => prev.filter(r => r.id !== id));
+            }
+        } catch (err) {
+            const msg = err.response?.data?.message || 'Failed to delete record';
+            showAlert({
+                title: 'Delete Failed',
+                message: msg,
+            });
+        } finally {
+            setDeleting(null);
+        }
+    };
+    const openDeleteConfirm = (row) => {
+        setPendingDelete(row);
+        setConfirmOpen(true);
+    };
+    const confirmDelete = async () => {
+        if (!pendingDelete) return;
+        const { id, voucher_number } = pendingDelete;
+        setConfirmOpen(false);
+        setPendingDelete(null);
+        await handleDelete(id, voucher_number);
+    };
+
     const filtered = useMemo(() => {
         const f = voucherNo.trim().toLowerCase(), v = vehicleNo.trim().toLowerCase();
         return rows.filter(r => {
@@ -78,7 +116,24 @@ const LoadingAdvanceTable = ({ refreshKey = 0 }) => {
                                         <TableCell>₹{Number(r.fuel_amount || 0).toFixed(2)}</TableCell>
                                         <TableCell>₹{Number(r.driver_loading_advance || 0).toFixed(2)}</TableCell>
                                         <TableCell>₹{Number(r.trip_balance || 0).toFixed(2)}</TableCell>
-                                        <TableCell className="text-right"><Button size="sm" variant="outline" onClick={() => navigate(`/transactions/loading-advance/${r.id}`)}>View</Button></TableCell>
+                                        <TableCell className="text-right">
+                                            <div className="flex items-center justify-end gap-2">
+                                                <Button size="sm" variant="outline" onClick={() => navigate(`/transactions/loading-advance/${r.id}`)}>View</Button>
+                                                <Button
+                                                    size="icon"
+                                                    variant="destructive"
+                                                    disabled={deleting === r.id}
+                                                    onClick={() => openDeleteConfirm(r)}
+                                                    aria-label={`Delete voucher ${r.voucher_number}`}
+                                                >
+                                                    {deleting === r.id ? (
+                                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                                    ) : (
+                                                        <Trash2 className="h-4 w-4" />
+                                                    )}
+                                                </Button>
+                                            </div>
+                                        </TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
@@ -86,6 +141,22 @@ const LoadingAdvanceTable = ({ refreshKey = 0 }) => {
                     </div>
                 )}
             </CardContent>
+            <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+                <DialogContent className="sm:max-w-[420px]">
+                    <DialogHeader>
+                        <DialogTitle>Delete Loading Advance</DialogTitle>
+                        <DialogDescription>
+                            {pendingDelete ? `Delete voucher ${pendingDelete.voucher_number}? This action cannot be undone.` : 'This action cannot be undone.'}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="pt-4">
+                        <Button variant="outline" onClick={() => setConfirmOpen(false)}>Cancel</Button>
+                        <Button variant="destructive" onClick={confirmDelete} disabled={!pendingDelete || deleting === pendingDelete?.id}>
+                            {deleting === pendingDelete?.id ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Delete'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </Card>
     );
 };

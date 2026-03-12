@@ -47,6 +47,7 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { cn } from '@/lib/utils';
+import { showAlert, showConfirm } from '@/lib/dialogService';
 
 const RateCardList = () => {
     const [rateCards, setRateCards] = useState([]);
@@ -143,7 +144,12 @@ const RateCardList = () => {
             }
 
             setSuccessMsg(`Imported ${successCount} rate cards successfully.`);
-            if (errors.length > 0) alert(`Failed to import: ${errors.join(', ')}`);
+            if (errors.length > 0) {
+                showAlert({
+                    title: 'Import Failed',
+                    message: `Failed to import: ${errors.join(', ')}`,
+                });
+            }
             loadRateCards();
         } catch (err) {
             setError('Import failed');
@@ -212,7 +218,12 @@ const RateCardList = () => {
     };
 
     const handleDelete = async (id) => {
-        if (!window.confirm(`Are you sure you want to delete this rate card?`)) return;
+        const ok = await showConfirm({
+            title: 'Delete Rate Card',
+            message: 'Are you sure you want to delete this rate card?',
+            confirmLabel: 'Delete',
+        });
+        if (!ok) return;
         try {
             const res = await rateCardAPI.delete(id);
             if (res.success) {

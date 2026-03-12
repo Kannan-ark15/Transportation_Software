@@ -43,6 +43,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { cn } from '@/lib/utils';
+import { showConfirm } from '@/lib/dialogService';
 
 const FREQUENCY_OPTIONS = [
     'Monthly',
@@ -488,7 +489,12 @@ const LoanMaster = () => {
     };
 
     const handleDelete = async (loan) => {
-        if (!window.confirm(`Are you sure you want to delete loan agreement "${loan.agreement_number}"?`)) return;
+        const ok = await showConfirm({
+            title: 'Delete Loan Agreement',
+            message: `Are you sure you want to delete loan agreement "${loan.agreement_number}"?`,
+            confirmLabel: 'Delete',
+        });
+        if (!ok) return;
         try {
             const res = await loanMasterAPI.delete(loan.id);
             if (res.success) {

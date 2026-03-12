@@ -47,6 +47,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { cn } from '@/lib/utils';
+import { showAlert, showConfirm } from '@/lib/dialogService';
 
 const DealerList = () => {
     const [dealers, setDealers] = useState([]);
@@ -119,7 +120,12 @@ const DealerList = () => {
             }
 
             setSuccessMsg(`Imported ${successCount} dealers successfully.`);
-            if (errors.length > 0) alert(`Failed to import: ${errors.join(', ')}`);
+            if (errors.length > 0) {
+                showAlert({
+                    title: 'Import Failed',
+                    message: `Failed to import: ${errors.join(', ')}`,
+                });
+            }
             loadData();
         } catch (err) {
             setError('Import failed');
@@ -186,7 +192,12 @@ const DealerList = () => {
     };
 
     const handleDelete = async (id, name) => {
-        if (!window.confirm(`Are you sure you want to delete dealer "${name}"?`)) return;
+        const ok = await showConfirm({
+            title: 'Delete Dealer',
+            message: `Are you sure you want to delete dealer "${name}"?`,
+            confirmLabel: 'Delete',
+        });
+        if (!ok) return;
         try {
             const res = await dealerAPI.delete(id);
             if (res.success) {

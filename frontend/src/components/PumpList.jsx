@@ -44,6 +44,7 @@ import {
     DialogFooter,
 } from "@/components/ui/dialog";
 import { cn } from '@/lib/utils';
+import { showAlert, showConfirm } from '@/lib/dialogService';
 
 const PumpList = () => {
     const [pumps, setPumps] = useState([]);
@@ -110,7 +111,12 @@ const PumpList = () => {
             }
 
             setSuccessMsg(`Imported ${successCount} pumps successfully.`);
-            if (errors.length > 0) alert(`Failed to import: ${errors.join(', ')}`);
+            if (errors.length > 0) {
+                showAlert({
+                    title: 'Import Failed',
+                    message: `Failed to import: ${errors.join(', ')}`,
+                });
+            }
             loadPumps();
         } catch (err) {
             setError('Import failed');
@@ -169,7 +175,12 @@ const PumpList = () => {
     };
 
     const handleDelete = async (id, name) => {
-        if (!window.confirm(`Are you sure you want to delete pump station "${name}"?`)) return;
+        const ok = await showConfirm({
+            title: 'Delete Pump Station',
+            message: `Are you sure you want to delete pump station "${name}"?`,
+            confirmLabel: 'Delete',
+        });
+        if (!ok) return;
         try {
             const res = await pumpAPI.delete(id);
             if (res.success) {

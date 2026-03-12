@@ -49,6 +49,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { cn } from '@/lib/utils';
+import { showAlert, showConfirm } from '@/lib/dialogService';
 
 const BankList = () => {
     const [banks, setBanks] = useState([]);
@@ -111,7 +112,12 @@ const BankList = () => {
             }
 
             setSuccessMsg(`Imported ${successCount} bank accounts successfully.`);
-            if (errors.length > 0) alert(`Failed to import: ${errors.join(', ')}`);
+            if (errors.length > 0) {
+                showAlert({
+                    title: 'Import Failed',
+                    message: `Failed to import: ${errors.join(', ')}`,
+                });
+            }
             loadBanks();
         } catch (err) {
             setError('Import failed');
@@ -193,7 +199,12 @@ const BankList = () => {
     };
 
     const handleDelete = async (id, name) => {
-        if (!window.confirm(`Are you sure you want to delete bank account for "${name}"?`)) return;
+        const ok = await showConfirm({
+            title: 'Delete Bank Account',
+            message: `Are you sure you want to delete bank account for "${name}"?`,
+            confirmLabel: 'Delete',
+        });
+        if (!ok) return;
         try {
             const res = await bankAPI.delete(id);
             if (res.success) {

@@ -41,6 +41,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { cn } from '@/lib/utils';
+import { showAlert, showConfirm } from '@/lib/dialogService';
 
 const ProductList = () => {
     const [products, setProducts] = useState([]);
@@ -103,7 +104,12 @@ const ProductList = () => {
             }
 
             setSuccessMsg(`Imported ${successCount} products successfully.`);
-            if (errors.length > 0) alert(`Failed to import: ${errors.join(', ')}`);
+            if (errors.length > 0) {
+                showAlert({
+                    title: 'Import Failed',
+                    message: `Failed to import: ${errors.join(', ')}`,
+                });
+            }
             loadProducts();
         } catch (err) {
             setError('Import failed');
@@ -154,7 +160,12 @@ const ProductList = () => {
     };
 
     const handleDelete = async (id, name) => {
-        if (!window.confirm(`Are you sure you want to delete "${name}"?`)) return;
+        const ok = await showConfirm({
+            title: 'Delete Product',
+            message: `Are you sure you want to delete "${name}"?`,
+            confirmLabel: 'Delete',
+        });
+        if (!ok) return;
         try {
             const res = await productAPI.delete(id);
             if (res.success) {

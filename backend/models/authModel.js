@@ -13,7 +13,7 @@ class AuthModel {
 
     static async findByEmail(email) {
         const query = `
-            SELECT id, full_name, email, login_prefix, password_hash, password_salt, is_active
+            SELECT id, full_name, email, login_prefix, password_hash, password_salt, is_active, is_admin
             FROM login_users
             WHERE email = $1
         `;
