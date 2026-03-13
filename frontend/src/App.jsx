@@ -22,6 +22,7 @@ import OwnVehicleSettlement from './components/OwnVehicleSettlement';
 import BalanceSettlement from './components/BalanceSettlement';
 import LoanMaster from './components/LoanMaster';
 import LoanRepayment from './components/LoanRepayment';
+import CashbookPayments from './components/CashbookPayments';
 import GlobalDialogProvider from './components/common/GlobalDialogProvider';
 
 function App() {
@@ -66,6 +67,7 @@ function App() {
                             <Route path="/transactions/own-vehicle-settlement" element={<OwnVehicleSettlement />} />
                             <Route path="/advances-loans/loan-master" element={<LoanMaster />} />
                             <Route path="/advances-loans/loan-repayment" element={<LoanRepayment />} />
+                            <Route path="/cashbook/payments" element={<CashbookPayments />} />
                             <Route path="/templates" element={<TemplatesPage />} />
                         </Route>
                         <Route path="*" element={<Navigate to="/" replace />} />

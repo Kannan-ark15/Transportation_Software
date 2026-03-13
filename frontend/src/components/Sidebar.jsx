@@ -8,6 +8,7 @@ import {
     FileText,
     ClipboardList,
     Landmark,
+    Wallet,
     BarChart3,
     Truck,
     LogOut
@@ -144,6 +145,15 @@ const Sidebar = () => {
             submenu: [
                 { label: 'Loan Master', path: '/advances-loans/loan-master' },
                 { label: 'Loan Repayment', path: '/advances-loans/loan-repayment' }
+            ]
+        },
+        {
+            id: 'cashbook',
+            label: 'Cashbook',
+            icon: <Wallet className="w-5 h-5" />,
+            hasSubmenu: true,
+            submenu: [
+                { label: 'Payments', path: '/cashbook/payments' }
             ]
         },
         {

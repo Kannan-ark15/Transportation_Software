@@ -116,6 +116,14 @@ export const loanRepaymentAPI = {
     }
 };
 
+export const cashbookPaymentAPI = {
+    ...generateCRUD('/cashbook-payments'),
+    getMeta: async () => {
+        const response = await api.get('/cashbook-payments/meta');
+        return response.data;
+    }
+};
+
 export const authAPI = {
     register: async (data) => {
         const response = await api.post('/auth/register', data);
