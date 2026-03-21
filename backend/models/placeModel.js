@@ -64,53 +64,30 @@ class PlaceModel {
 
             for (const rateCard of rateCards) {
                 const normalized = this.normalizeRateCard(rateCard);
-
-                // Check if rate card with same vehicle configuration exists
-                const existingCheck = await client.query(
-                    'SELECT * FROM rate_cards WHERE vehicle_type IS NOT DISTINCT FROM $1 AND vehicle_sub_type IS NOT DISTINCT FROM $2 AND vehicle_body_type IS NOT DISTINCT FROM $3',
-                    [normalized.vehicle_type, normalized.vehicle_sub_type, normalized.vehicle_body_type]
+                const rateCardResult = await client.query(
+                    'INSERT INTO rate_cards (vehicle_type, vehicle_sub_type, vehicle_body_type, rcl_freight, kt_freight, driver_bata, advance, unloading, tarpaulin, city_tax, maintenance) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *',
+                    [
+                        normalized.vehicle_type,
+                        normalized.vehicle_sub_type,
+                        normalized.vehicle_body_type,
+                        normalized.rcl_freight,
+                        normalized.kt_freight,
+                        normalized.driver_bata,
+                        normalized.advance,
+                        normalized.unloading,
+                        normalized.tarpaulin,
+                        normalized.city_tax,
+                        normalized.maintenance
+                    ]
                 );
 
-                let rateCardId;
-                if (existingCheck.rows.length > 0) {
-                    // Reuse existing rate card
-                    rateCardId = existingCheck.rows[0].id;
-                    createdRateCards.push(existingCheck.rows[0]);
-                } else {
-                    // Create new rate card
-                    const rateCardResult = await client.query(
-                        'INSERT INTO rate_cards (vehicle_type, vehicle_sub_type, vehicle_body_type, rcl_freight, kt_freight, driver_bata, advance, unloading, tarpaulin, city_tax, maintenance) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *',
-                        [
-                            normalized.vehicle_type,
-                            normalized.vehicle_sub_type,
-                            normalized.vehicle_body_type,
-                            normalized.rcl_freight,
-                            normalized.kt_freight,
-                            normalized.driver_bata,
-                            normalized.advance,
-                            normalized.unloading,
-                            normalized.tarpaulin,
-                            normalized.city_tax,
-                            normalized.maintenance
-                        ]
-                    );
-                    const created = rateCardResult.rows[0];
-                    rateCardId = created.id;
-                    createdRateCards.push(created);
-                }
+                const created = rateCardResult.rows[0];
+                createdRateCards.push(created);
 
-                // Check if this place-rate card relationship already exists
-                const placeRateExists = await client.query(
-                    'SELECT id FROM place_rate_cards WHERE place_id = $1 AND rate_card_id = $2',
-                    [place.id, rateCardId]
+                await client.query(
+                    'INSERT INTO place_rate_cards (place_id, rate_card_id) VALUES ($1, $2)',
+                    [place.id, created.id]
                 );
-
-                if (placeRateExists.rows.length === 0) {
-                    await client.query(
-                        'INSERT INTO place_rate_cards (place_id, rate_card_id) VALUES ($1, $2)',
-                        [place.id, rateCardId]
-                    );
-                }
             }
 
             await client.query('COMMIT');
@@ -218,53 +195,30 @@ class PlaceModel {
             const createdRateCards = [];
             for (const rateCard of rateCards) {
                 const normalized = this.normalizeRateCard(rateCard);
-
-                // Check if rate card with same vehicle configuration exists
-                const existingCheck = await client.query(
-                    'SELECT * FROM rate_cards WHERE vehicle_type IS NOT DISTINCT FROM $1 AND vehicle_sub_type IS NOT DISTINCT FROM $2 AND vehicle_body_type IS NOT DISTINCT FROM $3',
-                    [normalized.vehicle_type, normalized.vehicle_sub_type, normalized.vehicle_body_type]
+                const rateCardResult = await client.query(
+                    'INSERT INTO rate_cards (vehicle_type, vehicle_sub_type, vehicle_body_type, rcl_freight, kt_freight, driver_bata, advance, unloading, tarpaulin, city_tax, maintenance) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *',
+                    [
+                        normalized.vehicle_type,
+                        normalized.vehicle_sub_type,
+                        normalized.vehicle_body_type,
+                        normalized.rcl_freight,
+                        normalized.kt_freight,
+                        normalized.driver_bata,
+                        normalized.advance,
+                        normalized.unloading,
+                        normalized.tarpaulin,
+                        normalized.city_tax,
+                        normalized.maintenance
+                    ]
                 );
 
-                let rateCardId;
-                if (existingCheck.rows.length > 0) {
-                    // Reuse existing rate card
-                    rateCardId = existingCheck.rows[0].id;
-                    createdRateCards.push(existingCheck.rows[0]);
-                } else {
-                    // Create new rate card
-                    const rateCardResult = await client.query(
-                        'INSERT INTO rate_cards (vehicle_type, vehicle_sub_type, vehicle_body_type, rcl_freight, kt_freight, driver_bata, advance, unloading, tarpaulin, city_tax, maintenance) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *',
-                        [
-                            normalized.vehicle_type,
-                            normalized.vehicle_sub_type,
-                            normalized.vehicle_body_type,
-                            normalized.rcl_freight,
-                            normalized.kt_freight,
-                            normalized.driver_bata,
-                            normalized.advance,
-                            normalized.unloading,
-                            normalized.tarpaulin,
-                            normalized.city_tax,
-                            normalized.maintenance
-                        ]
-                    );
-                    const created = rateCardResult.rows[0];
-                    rateCardId = created.id;
-                    createdRateCards.push(created);
-                }
+                const created = rateCardResult.rows[0];
+                createdRateCards.push(created);
 
-                // Check if this place-rate card relationship already exists
-                const placeRateExists = await client.query(
-                    'SELECT id FROM place_rate_cards WHERE place_id = $1 AND rate_card_id = $2',
-                    [updatedPlace.id, rateCardId]
+                await client.query(
+                    'INSERT INTO place_rate_cards (place_id, rate_card_id) VALUES ($1, $2)',
+                    [updatedPlace.id, created.id]
                 );
-
-                if (placeRateExists.rows.length === 0) {
-                    await client.query(
-                        'INSERT INTO place_rate_cards (place_id, rate_card_id) VALUES ($1, $2)',
-                        [updatedPlace.id, rateCardId]
-                    );
-                }
             }
 
             await client.query('COMMIT');

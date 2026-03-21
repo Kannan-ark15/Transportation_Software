@@ -80,9 +80,11 @@ CREATE TABLE IF NOT EXISTS rate_cards (
     city_tax DECIMAL(10, 2) NOT NULL DEFAULT 0,
     maintenance DECIMAL(10, 2) NOT NULL DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(vehicle_type, vehicle_sub_type, vehicle_body_type) -- Unique vehicle configuration
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE INDEX IF NOT EXISTS idx_rate_cards_vehicle_configuration
+    ON rate_cards(vehicle_type, vehicle_sub_type, vehicle_body_type);
 
 -- 4B. PLACE RATE CHART MAPPING (Place <-> Rate Cards)
 CREATE TABLE IF NOT EXISTS place_rate_cards (
