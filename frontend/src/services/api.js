@@ -59,6 +59,14 @@ export const loadingAdvanceAPI = {
     }
 };
 
+export const driverAdvanceAPI = {
+    ...generateCRUD('/driver-advances'),
+    getMeta: async () => {
+        const response = await api.get('/driver-advances/meta');
+        return response.data;
+    }
+};
+
 export const acknowledgementAPI = generateCRUD('/acknowledgements');
 export const dedicatedMarketSettlementAPI = {
     ...generateCRUD('/dedicated-market-settlements'),

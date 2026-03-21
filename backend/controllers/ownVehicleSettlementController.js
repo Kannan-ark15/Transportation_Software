@@ -7,6 +7,52 @@ const toNumber = (value, fallback = 0) => {
     return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const roundCurrency = (value) => Number(toNumber(value, 0).toFixed(2));
+
+const applyDriverAdvanceRecovery = async (client, driverId, ownVehicleSettlementId, recoveryAmount) => {
+    let remaining = roundCurrency(recoveryAmount);
+    if (remaining <= 0) return 0;
+
+    const pendingAdvancesRes = await client.query(
+        `SELECT
+            da.id,
+            da.advance_amount,
+            da.advance_date,
+            COALESCE(SUM(dar.recovered_amount), 0)::DECIMAL(12,2) AS recovered_amount
+         FROM driver_advances da
+         LEFT JOIN driver_advance_recoveries dar ON dar.driver_advance_id = da.id
+         WHERE da.driver_id = $1
+         GROUP BY da.id, da.advance_amount, da.advance_date
+         HAVING (da.advance_amount - COALESCE(SUM(dar.recovered_amount), 0)) > 0
+         ORDER BY da.advance_date ASC, da.id ASC`,
+        [driverId]
+    );
+
+    let recoveredTotal = 0;
+
+    for (const advance of pendingAdvancesRes.rows) {
+        if (remaining <= 0) break;
+
+        const pendingAmount = roundCurrency(toNumber(advance.advance_amount) - toNumber(advance.recovered_amount));
+        if (pendingAmount <= 0) continue;
+
+        const recoverNow = roundCurrency(Math.min(pendingAmount, remaining));
+        if (recoverNow <= 0) continue;
+
+        await client.query(
+            `INSERT INTO driver_advance_recoveries
+                (driver_advance_id, own_vehicle_settlement_id, recovered_amount)
+             VALUES ($1, $2, $3)`,
+            [advance.id, ownVehicleSettlementId, recoverNow]
+        );
+
+        recoveredTotal = roundCurrency(recoveredTotal + recoverNow);
+        remaining = roundCurrency(remaining - recoverNow);
+    }
+
+    return recoveredTotal;
+};
+
 const getEligibleDrivers = async (req, res, next) => {
     try {
         const result = await pool.query(
@@ -300,6 +346,14 @@ const createSettlement = async (req, res, next) => {
             ]);
         }
 
+        // Balance settlement recovers pending driver advances using positive driver balance.
+        await applyDriverAdvanceRecovery(
+            client,
+            driver.id,
+            settlement.id,
+            Math.max(roundedTotalDriverBalance, 0)
+        );
+
         await client.query('COMMIT');
         res.status(201).json({ success: true, data: settlement });
     } catch (error) {
@@ -316,4 +370,3 @@ module.exports = {
     getAllSettlements,
     createSettlement
 };
-

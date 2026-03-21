@@ -359,6 +359,39 @@ CREATE TRIGGER update_own_vehicle_settlements_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
+-- Driver Advances (Transactions)
+CREATE TABLE IF NOT EXISTS driver_advances (
+    id SERIAL PRIMARY KEY,
+    driver_id INTEGER REFERENCES drivers(id) ON DELETE RESTRICT,
+    driver_name VARCHAR(255) NOT NULL,
+    advance_date DATE NOT NULL,
+    advance_amount DECIMAL(12, 2) NOT NULL CHECK (advance_amount > 0),
+    cash_bank VARCHAR(10) NOT NULL CHECK (cash_bank IN ('Cash', 'Bank')),
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS driver_advance_recoveries (
+    id SERIAL PRIMARY KEY,
+    driver_advance_id INTEGER REFERENCES driver_advances(id) ON DELETE CASCADE,
+    own_vehicle_settlement_id INTEGER REFERENCES own_vehicle_settlements(id) ON DELETE CASCADE,
+    recovered_amount DECIMAL(12, 2) NOT NULL CHECK (recovered_amount > 0),
+    recovered_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (driver_advance_id, own_vehicle_settlement_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_driver_advances_driver_id ON driver_advances(driver_id);
+CREATE INDEX IF NOT EXISTS idx_driver_advances_advance_date ON driver_advances(advance_date);
+CREATE INDEX IF NOT EXISTS idx_driver_advance_recoveries_advance_id ON driver_advance_recoveries(driver_advance_id);
+CREATE INDEX IF NOT EXISTS idx_driver_advance_recoveries_settlement_id ON driver_advance_recoveries(own_vehicle_settlement_id);
+
+DROP TRIGGER IF EXISTS update_driver_advances_updated_at ON driver_advances;
+CREATE TRIGGER update_driver_advances_updated_at
+    BEFORE UPDATE ON driver_advances
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
 -- Loan Master (Advances and Loans)
 CREATE TABLE IF NOT EXISTS loan_masters (
     id SERIAL PRIMARY KEY,

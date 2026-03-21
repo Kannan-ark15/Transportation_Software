@@ -133,6 +133,7 @@ const Sidebar = () => {
             hasSubmenu: true,
             submenu: [
                 { label: 'Loading Advance', path: '/transactions/loading-advance' },
+                { label: 'Driver Advance', path: '/transactions/driver-advance' },
                 { label: 'Acknowledgement', path: '/transactions/acknowledgement' },
                 { label: 'Balance Settlement', path: '/transactions/balance-settlement' }
             ]
