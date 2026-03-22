@@ -21,10 +21,13 @@ const defaultManualFields = {
     parking_charges: '0',
     expenditure_1: '0',
     expenditure_2: '0',
-    expenditure_3: '0'
+    expenditure_3: '0',
+    deduction: '0'
 };
 
 const OwnVehicleSettlement = () => {
+    const authUser = (() => { try { return JSON.parse(localStorage.getItem('auth_user') || '{}'); } catch { return {}; } })();
+    const isAdmin = !!authUser.is_admin;
     const [drivers, setDrivers] = useState([]);
     const [settlements, setSettlements] = useState([]);
     const [readyVouchers, setReadyVouchers] = useState([]);
@@ -32,7 +35,10 @@ const OwnVehicleSettlement = () => {
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
     const [successMsg, setSuccessMsg] = useState('');
-    const [search, setSearch] = useState('');
+    const [driverSearch, setDriverSearch] = useState('');
+    const [voucherSearch, setVoucherSearch] = useState('');
+    const [fromDate, setFromDate] = useState('');
+    const [toDate, setToDate] = useState('');
 
     const [form, setForm] = useState({
         driver_id: '',
@@ -66,6 +72,7 @@ const OwnVehicleSettlement = () => {
     const getDriverBalance = (row) => {
         const manual = getManualFields(row.acknowledgement_id);
         const totalExpenses =
+            toNumber(row.driver_bata) +
             toNumber(row.unloading) +
             toNumber(row.tarpaulin) +
             toNumber(row.city_tax) +
@@ -79,19 +86,19 @@ const OwnVehicleSettlement = () => {
         return Number((toNumber(row.driver_loading_advance) - totalExpenses).toFixed(2));
     };
 
-    const totalDriverBata = useMemo(
-        () => Number(selectedVouchers.reduce((sum, row) => sum + toNumber(row.driver_bata), 0).toFixed(2)),
-        [selectedVouchers]
-    );
-
     const totalDriverBalance = useMemo(
         () => Number(selectedVouchers.reduce((sum, row) => sum + getDriverBalance(row), 0).toFixed(2)),
         [selectedVouchers, manualFieldsByAck]
     );
 
+    const pendingAdvance = useMemo(
+        () => Number(toNumber(selectedDriver?.pending_advance, 0).toFixed(2)),
+        [selectedDriver]
+    );
+
     const driverSalaryPayable = useMemo(
-        () => Number((totalDriverBata - totalDriverBalance).toFixed(2)),
-        [totalDriverBata, totalDriverBalance]
+        () => Number((totalDriverBalance - pendingAdvance).toFixed(2)),
+        [totalDriverBalance, pendingAdvance]
     );
 
     useEffect(() => {
@@ -187,6 +194,21 @@ const OwnVehicleSettlement = () => {
         }));
     };
 
+    const clearAllDeductions = () => {
+        if (!isAdmin) return;
+        setManualFieldsByAck(prev => {
+            const next = { ...prev };
+            for (const row of readyVouchers) {
+                const ackId = row.acknowledgement_id;
+                next[ackId] = {
+                    ...(next[ackId] || defaultManualFields),
+                    deduction: '0'
+                };
+            }
+            return next;
+        });
+    };
+
     const validate = () => {
         if (!form.driver_id) return 'Driver Name is required';
         if (!form.cash_bank) return 'Cash / Bank is required';
@@ -197,12 +219,29 @@ const OwnVehicleSettlement = () => {
 
         for (const row of selectedVouchers) {
             const manual = getManualFields(row.acknowledgement_id);
-            const fields = ['parking_charges', 'expenditure_1', 'expenditure_2', 'expenditure_3'];
+            const requiredAutoFields = [
+                ['voucher date', row.voucher_date],
+                ['to place', row.to_place],
+                ['fuel litre', row.fuel_litre],
+                ['last odometer', row.last_odometer],
+                ['current odometer', row.current_odometer],
+                ['run kms', row.run_kms],
+                ['mileage', row.mileage]
+            ];
+            for (const [label, value] of requiredAutoFields) {
+                if (value === null || value === undefined || value === '') {
+                    return `Missing ${label} for voucher ${row.voucher_number}. Update source data first.`;
+                }
+            }
+            const fields = ['parking_charges', 'expenditure_1', 'expenditure_2', 'expenditure_3', 'deduction'];
             for (const field of fields) {
                 const value = toNumber(manual[field], NaN);
                 if (!Number.isFinite(value) || value < 0) {
                     return `Invalid value for ${field.replace('_', ' ')} in voucher ${row.voucher_number}`;
                 }
+            }
+            if (!isAdmin && toNumber(manual.deduction, 0) !== 0) {
+                return `Only admin can set deduction in voucher ${row.voucher_number}`;
             }
         }
         return '';
@@ -233,7 +272,8 @@ const OwnVehicleSettlement = () => {
                         parking_charges: Number(toNumber(manual.parking_charges, 0).toFixed(2)),
                         expenditure_1: Number(toNumber(manual.expenditure_1, 0).toFixed(2)),
                         expenditure_2: Number(toNumber(manual.expenditure_2, 0).toFixed(2)),
-                        expenditure_3: Number(toNumber(manual.expenditure_3, 0).toFixed(2))
+                        expenditure_3: Number(toNumber(manual.expenditure_3, 0).toFixed(2)),
+                        deduction: Number(toNumber(manual.deduction, 0).toFixed(2))
                     };
                 })
             };
@@ -251,14 +291,33 @@ const OwnVehicleSettlement = () => {
         }
     };
 
+    const settlementVoucherOptions = useMemo(() => {
+        const set = new Set();
+        for (const row of settlements) {
+            const vouchers = String(row.voucher_numbers || '')
+                .split(',')
+                .map(v => v.trim())
+                .filter(Boolean);
+            for (const voucher of vouchers) set.add(voucher);
+        }
+        return Array.from(set).sort((a, b) => a.localeCompare(b));
+    }, [settlements]);
+
     const filteredSettlements = useMemo(() => {
-        const q = search.trim().toLowerCase();
-        if (!q) return settlements;
-        return settlements.filter(row =>
-            String(row.driver_name || '').toLowerCase().includes(q) ||
-            String(row.voucher_numbers || '').toLowerCase().includes(q)
-        );
-    }, [settlements, search]);
+        const driverQ = driverSearch.trim().toLowerCase();
+        const voucherQ = voucherSearch.trim().toLowerCase();
+        const from = fromDate ? new Date(`${fromDate}T00:00:00`) : null;
+        const to = toDate ? new Date(`${toDate}T23:59:59.999`) : null;
+
+        return settlements.filter(row => {
+            const settledAt = row.settled_at ? new Date(row.settled_at) : null;
+            const matchesDriver = !driverQ || String(row.driver_name || '').toLowerCase().includes(driverQ);
+            const matchesVoucher = !voucherQ || String(row.voucher_numbers || '').toLowerCase().includes(voucherQ);
+            const matchesFrom = !from || (settledAt && settledAt >= from);
+            const matchesTo = !to || (settledAt && settledAt <= to);
+            return matchesDriver && matchesVoucher && matchesFrom && matchesTo;
+        });
+    }, [settlements, driverSearch, voucherSearch, fromDate, toDate]);
 
     if (loading) {
         return (
@@ -336,7 +395,12 @@ const OwnVehicleSettlement = () => {
                     <Separator />
 
                     <div className="space-y-4">
-                        <h4 className="text-sm font-bold text-slate-500 uppercase tracking-wider">Settlement Ready Vouchers</h4>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <h4 className="text-sm font-bold text-slate-500 uppercase tracking-wider">Settlement Ready Vouchers</h4>
+                            <Button type="button" variant="outline" size="sm" onClick={clearAllDeductions} disabled={!isAdmin || readyVouchers.length === 0}>
+                                Clear All Deductions
+                            </Button>
+                        </div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="space-y-1">
                                 <Label>Vehicle Number</Label>
@@ -357,9 +421,11 @@ const OwnVehicleSettlement = () => {
                                         <TableHead>Select</TableHead>
                                         <TableHead>Vehicle Number</TableHead>
                                         <TableHead>Voucher Number</TableHead>
-                                        <TableHead>Sum IFAs</TableHead>
+                                        <TableHead>Voucher Date</TableHead>
+                                        <TableHead>Cash/Bank</TableHead>
+                                        <TableHead>To Place</TableHead>
                                         <TableHead>Driver Bata</TableHead>
-                                        <TableHead>Unloading</TableHead>
+                                        <TableHead>Unloading Charges</TableHead>
                                         <TableHead>Tarpaulin</TableHead>
                                         <TableHead>City Tax</TableHead>
                                         <TableHead>Maintenance</TableHead>
@@ -367,15 +433,21 @@ const OwnVehicleSettlement = () => {
                                         <TableHead>Expenditure 1</TableHead>
                                         <TableHead>Expenditure 2</TableHead>
                                         <TableHead>Expenditure 3</TableHead>
+                                        <TableHead>Deduction</TableHead>
+                                        <TableHead>Fuel Litre</TableHead>
                                         <TableHead>Fuel Amount</TableHead>
                                         <TableHead>Driver Loading Advance</TableHead>
+                                        <TableHead>Last Odometer</TableHead>
+                                        <TableHead>Current Odometer</TableHead>
+                                        <TableHead>Run Kms</TableHead>
+                                        <TableHead>Mileage</TableHead>
                                         <TableHead>Driver Balance</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {readyVouchers.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={16} className="text-center text-sm text-slate-400 py-6">
+                                            <TableCell colSpan={24} className="text-center text-sm text-slate-400 py-6">
                                                 No ready-for-settlement vouchers available for this driver.
                                             </TableCell>
                                         </TableRow>
@@ -383,6 +455,10 @@ const OwnVehicleSettlement = () => {
                                         readyVouchers.map(row => {
                                             const selected = selectedVoucherIds.includes(row.acknowledgement_id);
                                             const manual = getManualFields(row.acknowledgement_id);
+                                            const hasLastOdometer = row.last_odometer !== null && row.last_odometer !== undefined && row.last_odometer !== '';
+                                            const hasCurrentOdometer = row.current_odometer !== null && row.current_odometer !== undefined && row.current_odometer !== '';
+                                            const hasRunKms = row.run_kms !== null && row.run_kms !== undefined && row.run_kms !== '';
+                                            const hasMileage = row.mileage !== null && row.mileage !== undefined && row.mileage !== '';
                                             return (
                                                 <TableRow key={row.acknowledgement_id}>
                                                     <TableCell>
@@ -394,7 +470,9 @@ const OwnVehicleSettlement = () => {
                                                     </TableCell>
                                                     <TableCell>{row.vehicle_number}</TableCell>
                                                     <TableCell className="font-medium">{row.voucher_number}</TableCell>
-                                                    <TableCell>{toNumber(row.sum_ifas).toFixed(2)}</TableCell>
+                                                    <TableCell>{row.voucher_date ? new Date(row.voucher_date).toLocaleDateString() : '-'}</TableCell>
+                                                    <TableCell>{form.cash_bank}</TableCell>
+                                                    <TableCell>{row.to_place || '-'}</TableCell>
                                                     <TableCell>{toNumber(row.driver_bata).toFixed(2)}</TableCell>
                                                     <TableCell>{toNumber(row.unloading).toFixed(2)}</TableCell>
                                                     <TableCell>{toNumber(row.tarpaulin).toFixed(2)}</TableCell>
@@ -440,8 +518,23 @@ const OwnVehicleSettlement = () => {
                                                             onChange={e => updateManualField(row.acknowledgement_id, 'expenditure_3', e.target.value)}
                                                         />
                                                     </TableCell>
+                                                    <TableCell className="min-w-[130px]">
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            min="0"
+                                                            disabled={!selected || !isAdmin}
+                                                            value={manual.deduction}
+                                                            onChange={e => updateManualField(row.acknowledgement_id, 'deduction', e.target.value)}
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell>{toNumber(row.fuel_litre).toFixed(2)}</TableCell>
                                                     <TableCell>{toNumber(row.fuel_amount).toFixed(2)}</TableCell>
                                                     <TableCell>{toNumber(row.driver_loading_advance).toFixed(2)}</TableCell>
+                                                    <TableCell>{hasLastOdometer ? toNumber(row.last_odometer).toFixed(3) : '-'}</TableCell>
+                                                    <TableCell>{hasCurrentOdometer ? toNumber(row.current_odometer).toFixed(3) : '-'}</TableCell>
+                                                    <TableCell>{hasRunKms ? toNumber(row.run_kms).toFixed(3) : '-'}</TableCell>
+                                                    <TableCell>{hasMileage ? toNumber(row.mileage).toFixed(3) : '-'}</TableCell>
                                                     <TableCell>{selected ? getDriverBalance(row).toFixed(2) : '-'}</TableCell>
                                                 </TableRow>
                                             );
@@ -451,14 +544,14 @@ const OwnVehicleSettlement = () => {
                             </Table>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <div className="space-y-1">
-                                <Label>Total Driver Bata</Label>
-                                <Input disabled value={totalDriverBata.toFixed(2)} />
-                            </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             <div className="space-y-1">
                                 <Label>Total Driver Balance</Label>
                                 <Input disabled value={totalDriverBalance.toFixed(2)} />
+                            </div>
+                            <div className="space-y-1">
+                                <Label>Pending Advance</Label>
+                                <Input disabled value={pendingAdvance.toFixed(2)} />
                             </div>
                             <div className="space-y-1">
                                 <Label>Driver Salary Payable</Label>
@@ -482,16 +575,36 @@ const OwnVehicleSettlement = () => {
                     <CardTitle className="text-xl font-bold text-slate-900">Settlement Records</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4 pt-5">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                         <div className="space-y-1">
-                            <Label>Search</Label>
+                            <Label>Driver Name</Label>
                             <Input
-                                value={search}
-                                onChange={e => setSearch(e.target.value)}
-                                placeholder="Search by driver / voucher number"
+                                value={driverSearch}
+                                onChange={e => setDriverSearch(e.target.value)}
+                                placeholder="Search driver"
                             />
                         </div>
+                        <div className="space-y-1">
+                            <Label>Voucher List</Label>
+                            <Input
+                                list="own_vehicle_voucher_list"
+                                value={voucherSearch}
+                                onChange={e => setVoucherSearch(e.target.value)}
+                                placeholder="Search voucher"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <Label>From Date</Label>
+                            <Input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} />
+                        </div>
+                        <div className="space-y-1">
+                            <Label>To Date</Label>
+                            <Input type="date" value={toDate} onChange={e => setToDate(e.target.value)} />
+                        </div>
                     </div>
+                    <datalist id="own_vehicle_voucher_list">
+                        {settlementVoucherOptions.map(v => <option key={v} value={v} />)}
+                    </datalist>
                     {filteredSettlements.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-10 text-slate-400">
                             <SearchX className="w-10 h-10 mb-3" />
@@ -509,6 +622,7 @@ const OwnVehicleSettlement = () => {
                                         <TableHead>Voucher Number</TableHead>
                                         <TableHead>Total Driver Bata</TableHead>
                                         <TableHead>Total Driver Balance</TableHead>
+                                        <TableHead>Pending Advance</TableHead>
                                         <TableHead>Driver Salary Payable</TableHead>
                                         <TableHead>Settled Date</TableHead>
                                     </TableRow>
@@ -527,6 +641,7 @@ const OwnVehicleSettlement = () => {
                                             <TableCell>{row.voucher_numbers || '-'}</TableCell>
                                             <TableCell>{toNumber(row.total_driver_bata).toFixed(2)}</TableCell>
                                             <TableCell>{toNumber(row.total_driver_balance).toFixed(2)}</TableCell>
+                                            <TableCell>{toNumber(row.pending_advance).toFixed(2)}</TableCell>
                                             <TableCell>{toNumber(row.driver_salary_payable).toFixed(2)}</TableCell>
                                             <TableCell>{row.settled_at ? new Date(row.settled_at).toLocaleDateString() : '-'}</TableCell>
                                         </TableRow>
@@ -542,4 +657,3 @@ const OwnVehicleSettlement = () => {
 };
 
 export default OwnVehicleSettlement;
-

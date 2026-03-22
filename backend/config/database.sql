@@ -327,6 +327,7 @@ CREATE TABLE IF NOT EXISTS own_vehicle_settlements (
     ifsc_code VARCHAR(20),
     total_driver_bata DECIMAL(12, 2) NOT NULL DEFAULT 0,
     total_driver_balance DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    pending_advance DECIMAL(12, 2) NOT NULL DEFAULT 0,
     driver_salary_payable DECIMAL(12, 2) NOT NULL DEFAULT 0,
     settled BOOLEAN NOT NULL DEFAULT TRUE,
     settled_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -341,6 +342,8 @@ CREATE TABLE IF NOT EXISTS own_vehicle_settlement_vouchers (
     loading_advance_id INTEGER UNIQUE REFERENCES loading_advances(id) ON DELETE RESTRICT,
     vehicle_number VARCHAR(50) NOT NULL,
     voucher_number VARCHAR(20) NOT NULL,
+    voucher_date TIMESTAMP WITH TIME ZONE,
+    to_place VARCHAR(255),
     sum_ifas DECIMAL(12, 2) NOT NULL DEFAULT 0,
     driver_bata DECIMAL(12, 2) NOT NULL DEFAULT 0,
     unloading DECIMAL(12, 2) NOT NULL DEFAULT 0,
@@ -351,11 +354,27 @@ CREATE TABLE IF NOT EXISTS own_vehicle_settlement_vouchers (
     expenditure_1 DECIMAL(12, 2) NOT NULL DEFAULT 0,
     expenditure_2 DECIMAL(12, 2) NOT NULL DEFAULT 0,
     expenditure_3 DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    deduction DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    fuel_litre DECIMAL(12, 2) NOT NULL DEFAULT 0,
     fuel_amount DECIMAL(12, 2) NOT NULL DEFAULT 0,
     driver_loading_advance DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    last_odometer DECIMAL(12, 3),
+    current_odometer DECIMAL(12, 3),
+    run_kms DECIMAL(12, 3),
+    mileage DECIMAL(12, 3),
     driver_balance DECIMAL(12, 2) NOT NULL DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE IF EXISTS own_vehicle_settlements ADD COLUMN IF NOT EXISTS pending_advance DECIMAL(12, 2) NOT NULL DEFAULT 0;
+ALTER TABLE IF EXISTS own_vehicle_settlement_vouchers ADD COLUMN IF NOT EXISTS voucher_date TIMESTAMP WITH TIME ZONE;
+ALTER TABLE IF EXISTS own_vehicle_settlement_vouchers ADD COLUMN IF NOT EXISTS to_place VARCHAR(255);
+ALTER TABLE IF EXISTS own_vehicle_settlement_vouchers ADD COLUMN IF NOT EXISTS deduction DECIMAL(12, 2) NOT NULL DEFAULT 0;
+ALTER TABLE IF EXISTS own_vehicle_settlement_vouchers ADD COLUMN IF NOT EXISTS fuel_litre DECIMAL(12, 2) NOT NULL DEFAULT 0;
+ALTER TABLE IF EXISTS own_vehicle_settlement_vouchers ADD COLUMN IF NOT EXISTS last_odometer DECIMAL(12, 3);
+ALTER TABLE IF EXISTS own_vehicle_settlement_vouchers ADD COLUMN IF NOT EXISTS current_odometer DECIMAL(12, 3);
+ALTER TABLE IF EXISTS own_vehicle_settlement_vouchers ADD COLUMN IF NOT EXISTS run_kms DECIMAL(12, 3);
+ALTER TABLE IF EXISTS own_vehicle_settlement_vouchers ADD COLUMN IF NOT EXISTS mileage DECIMAL(12, 3);
 
 CREATE INDEX IF NOT EXISTS idx_ov_settlements_driver_id ON own_vehicle_settlements(driver_id);
 CREATE INDEX IF NOT EXISTS idx_ov_settlements_driver_name ON own_vehicle_settlements(driver_name);

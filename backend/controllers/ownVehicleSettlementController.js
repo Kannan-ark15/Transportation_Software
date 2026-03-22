@@ -9,6 +9,26 @@ const toNumber = (value, fallback = 0) => {
 
 const roundCurrency = (value) => Number(toNumber(value, 0).toFixed(2));
 
+const getPendingAdvanceForDriver = async (client, driverId) => {
+    const result = await client.query(
+        `SELECT
+            GREATEST(
+                COALESCE((SELECT SUM(da.advance_amount) FROM driver_advances da WHERE da.driver_id = $1), 0)
+                -
+                COALESCE((
+                    SELECT SUM(dar.recovered_amount)
+                    FROM driver_advance_recoveries dar
+                    JOIN driver_advances da ON da.id = dar.driver_advance_id
+                    WHERE da.driver_id = $1
+                ), 0),
+                0
+            )::DECIMAL(12,2) AS pending_advance`,
+        [driverId]
+    );
+
+    return roundCurrency(result.rows[0]?.pending_advance || 0);
+};
+
 const applyDriverAdvanceRecovery = async (client, driverId, ownVehicleSettlementId, recoveryAmount) => {
     let remaining = roundCurrency(recoveryAmount);
     if (remaining <= 0) return 0;
@@ -56,10 +76,29 @@ const applyDriverAdvanceRecovery = async (client, driverId, ownVehicleSettlement
 const getEligibleDrivers = async (req, res, next) => {
     try {
         const result = await pool.query(
-            `SELECT id, driver_id, driver_name, bank_name, branch, account_number, ifsc_code
-             FROM drivers
+            `SELECT
+                d.id,
+                d.driver_id,
+                d.driver_name,
+                d.bank_name,
+                d.branch,
+                d.account_number,
+                d.ifsc_code,
+                GREATEST(COALESCE(adv.total_advance_given, 0) - COALESCE(rec.total_recovered, 0), 0)::DECIMAL(12,2) AS pending_advance
+             FROM drivers d
+             LEFT JOIN (
+                SELECT driver_id, SUM(advance_amount) AS total_advance_given
+                FROM driver_advances
+                GROUP BY driver_id
+             ) adv ON adv.driver_id = d.id
+             LEFT JOIN (
+                SELECT da.driver_id, SUM(dar.recovered_amount) AS total_recovered
+                FROM driver_advance_recoveries dar
+                JOIN driver_advances da ON da.id = dar.driver_advance_id
+                GROUP BY da.driver_id
+             ) rec ON rec.driver_id = d.id
              WHERE driver_status = TRUE
-             ORDER BY driver_name ASC`
+             ORDER BY d.driver_name ASC`
         );
         res.status(200).json({ success: true, data: result.rows });
     } catch (error) {
@@ -79,6 +118,8 @@ const getReadyVouchers = async (req, res, next) => {
                 la.driver_name,
                 la.vehicle_registration_number AS vehicle_number,
                 a.voucher_number,
+                la.voucher_datetime AS voucher_date,
+                COALESCE(la.to_place, '') AS to_place,
                 COALESCE(
                     la.sum_ifas,
                     (SELECT SUM(lai.ifa_amount) FROM loading_advance_invoices lai WHERE lai.loading_advance_id = la.id),
@@ -89,8 +130,13 @@ const getReadyVouchers = async (req, res, next) => {
                 COALESCE(la.tarpaulin, 0)::DECIMAL(12,2) AS tarpaulin,
                 COALESCE(la.city_tax, 0)::DECIMAL(12,2) AS city_tax,
                 COALESCE(la.maintenance, 0)::DECIMAL(12,2) AS maintenance,
+                COALESCE(la.fuel_litre, 0)::DECIMAL(12,2) AS fuel_litre,
                 COALESCE(la.fuel_amount, (COALESCE(la.fuel_litre, 0) * COALESCE(la.fuel_rate, 0)), 0)::DECIMAL(12,2) AS fuel_amount,
-                COALESCE(la.driver_loading_advance, 0)::DECIMAL(12,2) AS driver_loading_advance
+                COALESCE(la.driver_loading_advance, 0)::DECIMAL(12,2) AS driver_loading_advance,
+                a.last_odometer::DECIMAL(12,3) AS last_odometer,
+                a.current_odometer::DECIMAL(12,3) AS current_odometer,
+                a.run_kms::DECIMAL(12,3) AS run_kms,
+                a.mileage::DECIMAL(12,3) AS mileage
              FROM acknowledgements a
              JOIN loading_advances la ON la.id = a.loading_advance_id
              LEFT JOIN own_vehicle_settlement_vouchers ovsv ON ovsv.loading_advance_id = la.id
@@ -194,8 +240,9 @@ const createSettlement = async (req, res, next) => {
             const expenditure1 = toNumber(voucher.expenditure_1, 0);
             const expenditure2 = toNumber(voucher.expenditure_2, 0);
             const expenditure3 = toNumber(voucher.expenditure_3, 0);
+            const deduction = toNumber(voucher.deduction, 0);
 
-            if (parkingCharges < 0 || expenditure1 < 0 || expenditure2 < 0 || expenditure3 < 0) {
+            if (parkingCharges < 0 || expenditure1 < 0 || expenditure2 < 0 || expenditure3 < 0 || deduction < 0) {
                 return res.status(400).json({ success: false, message: 'Manual expense fields cannot be negative' });
             }
 
@@ -203,7 +250,8 @@ const createSettlement = async (req, res, next) => {
                 parking_charges: Number(parkingCharges.toFixed(2)),
                 expenditure_1: Number(expenditure1.toFixed(2)),
                 expenditure_2: Number(expenditure2.toFixed(2)),
-                expenditure_3: Number(expenditure3.toFixed(2))
+                expenditure_3: Number(expenditure3.toFixed(2)),
+                deduction: Number(deduction.toFixed(2))
             });
             ackIds.push(ackId);
         }
@@ -214,6 +262,8 @@ const createSettlement = async (req, res, next) => {
                 la.id AS loading_advance_id,
                 la.vehicle_registration_number AS vehicle_number,
                 a.voucher_number,
+                la.voucher_datetime AS voucher_date,
+                COALESCE(la.to_place, '') AS to_place,
                 COALESCE(
                     la.sum_ifas,
                     (SELECT SUM(lai.ifa_amount) FROM loading_advance_invoices lai WHERE lai.loading_advance_id = la.id),
@@ -224,8 +274,13 @@ const createSettlement = async (req, res, next) => {
                 COALESCE(la.tarpaulin, 0)::DECIMAL(12,2) AS tarpaulin,
                 COALESCE(la.city_tax, 0)::DECIMAL(12,2) AS city_tax,
                 COALESCE(la.maintenance, 0)::DECIMAL(12,2) AS maintenance,
+                COALESCE(la.fuel_litre, 0)::DECIMAL(12,2) AS fuel_litre,
                 COALESCE(la.fuel_amount, (COALESCE(la.fuel_litre, 0) * COALESCE(la.fuel_rate, 0)), 0)::DECIMAL(12,2) AS fuel_amount,
-                COALESCE(la.driver_loading_advance, 0)::DECIMAL(12,2) AS driver_loading_advance
+                COALESCE(la.driver_loading_advance, 0)::DECIMAL(12,2) AS driver_loading_advance,
+                a.last_odometer::DECIMAL(12,3) AS last_odometer,
+                a.current_odometer::DECIMAL(12,3) AS current_odometer,
+                a.run_kms::DECIMAL(12,3) AS run_kms,
+                a.mileage::DECIMAL(12,3) AS mileage
              FROM acknowledgements a
              JOIN loading_advances la ON la.id = a.loading_advance_id
              LEFT JOIN own_vehicle_settlement_vouchers ovsv ON ovsv.loading_advance_id = la.id
@@ -251,8 +306,25 @@ const createSettlement = async (req, res, next) => {
                 parking_charges: 0,
                 expenditure_1: 0,
                 expenditure_2: 0,
-                expenditure_3: 0
+                expenditure_3: 0,
+                deduction: 0
             };
+
+            if (!voucher.voucher_date) {
+                return res.status(400).json({ success: false, message: `Voucher date is missing for voucher ${voucher.voucher_number}` });
+            }
+            if (!voucher.to_place) {
+                return res.status(400).json({ success: false, message: `To Place is missing for voucher ${voucher.voucher_number}` });
+            }
+            const runMetricsFields = ['last_odometer', 'current_odometer', 'run_kms', 'mileage'];
+            for (const field of runMetricsFields) {
+                if (voucher[field] === null || voucher[field] === undefined) {
+                    return res.status(400).json({
+                        success: false,
+                        message: `Acknowledgement run metrics are missing for voucher ${voucher.voucher_number}. Please update acknowledgement first.`
+                    });
+                }
+            }
 
             const driverBata = toNumber(voucher.driver_bata);
             const unloading = toNumber(voucher.unloading);
@@ -262,7 +334,8 @@ const createSettlement = async (req, res, next) => {
             const fuelAmount = toNumber(voucher.fuel_amount);
             const driverLoadingAdvance = toNumber(voucher.driver_loading_advance);
 
-            const totalExpenses = unloading
+            const totalExpenses = driverBata
+                + unloading
                 + tarpaulin
                 + cityTax
                 + maintenance
@@ -283,13 +356,15 @@ const createSettlement = async (req, res, next) => {
                 expenditure_1: meta.expenditure_1,
                 expenditure_2: meta.expenditure_2,
                 expenditure_3: meta.expenditure_3,
+                deduction: meta.deduction,
                 driver_balance: driverBalance
             });
         }
 
         const roundedTotalDriverBata = Number(totalDriverBata.toFixed(2));
         const roundedTotalDriverBalance = Number(totalDriverBalance.toFixed(2));
-        const driverSalaryPayable = Number((roundedTotalDriverBata - roundedTotalDriverBalance).toFixed(2));
+        const pendingAdvance = await getPendingAdvanceForDriver(client, driver.id);
+        const driverSalaryPayable = Number((roundedTotalDriverBalance - pendingAdvance).toFixed(2));
 
         await client.query('BEGIN');
         inTx = true;
@@ -297,8 +372,8 @@ const createSettlement = async (req, res, next) => {
         const settlementRes = await client.query(
             `INSERT INTO own_vehicle_settlements
                 (driver_id, driver_name, cash_bank, bank_name, branch, account_number, ifsc_code,
-                 total_driver_bata, total_driver_balance, driver_salary_payable, settled)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+                 total_driver_bata, total_driver_balance, pending_advance, driver_salary_payable, settled)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
              RETURNING *`,
             [
                 driver.id,
@@ -310,6 +385,7 @@ const createSettlement = async (req, res, next) => {
                 effectiveIfscCode,
                 roundedTotalDriverBata,
                 roundedTotalDriverBalance,
+                pendingAdvance,
                 driverSalaryPayable,
                 true
             ]
@@ -318,10 +394,10 @@ const createSettlement = async (req, res, next) => {
         const settlement = settlementRes.rows[0];
         const voucherInsert = `INSERT INTO own_vehicle_settlement_vouchers
             (settlement_id, acknowledgement_id, loading_advance_id, vehicle_number, voucher_number,
-             sum_ifas, driver_bata, unloading, tarpaulin, city_tax, maintenance,
-             parking_charges, expenditure_1, expenditure_2, expenditure_3,
-             fuel_amount, driver_loading_advance, driver_balance)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`;
+             voucher_date, to_place, sum_ifas, driver_bata, unloading, tarpaulin, city_tax, maintenance,
+             parking_charges, expenditure_1, expenditure_2, expenditure_3, deduction,
+             fuel_litre, fuel_amount, driver_loading_advance, last_odometer, current_odometer, run_kms, mileage, driver_balance)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)`;
 
         for (const voucher of computedVoucherRows) {
             await client.query(voucherInsert, [
@@ -330,6 +406,8 @@ const createSettlement = async (req, res, next) => {
                 voucher.loading_advance_id,
                 voucher.vehicle_number,
                 voucher.voucher_number,
+                voucher.voucher_date || null,
+                voucher.to_place || null,
                 Number(toNumber(voucher.sum_ifas).toFixed(2)),
                 Number(toNumber(voucher.driver_bata).toFixed(2)),
                 Number(toNumber(voucher.unloading).toFixed(2)),
@@ -340,8 +418,14 @@ const createSettlement = async (req, res, next) => {
                 voucher.expenditure_1,
                 voucher.expenditure_2,
                 voucher.expenditure_3,
+                voucher.deduction,
+                Number(toNumber(voucher.fuel_litre).toFixed(2)),
                 Number(toNumber(voucher.fuel_amount).toFixed(2)),
                 Number(toNumber(voucher.driver_loading_advance).toFixed(2)),
+                Number(toNumber(voucher.last_odometer).toFixed(3)),
+                Number(toNumber(voucher.current_odometer).toFixed(3)),
+                Number(toNumber(voucher.run_kms).toFixed(3)),
+                Number(toNumber(voucher.mileage).toFixed(3)),
                 voucher.driver_balance
             ]);
         }
