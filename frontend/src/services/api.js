@@ -143,6 +143,18 @@ export const reminderDashboardAPI = {
     }
 };
 
+export const gstInvoiceAPI = {
+    ...generateCRUD('/gst-invoices'),
+    getMeta: async () => {
+        const response = await api.get('/gst-invoices/meta');
+        return response.data;
+    },
+    updateFilingStatus: async (id, filing_status) => {
+        const response = await api.patch(`/gst-invoices/${id}/filing-status`, { filing_status });
+        return response.data;
+    }
+};
+
 export const authAPI = {
     register: async (data) => {
         const response = await api.post('/auth/register', data);

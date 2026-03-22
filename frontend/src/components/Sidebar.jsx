@@ -11,6 +11,7 @@ import {
     Wallet,
     BarChart3,
     Truck,
+    ReceiptText,
     LogOut
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -162,6 +163,12 @@ const Sidebar = () => {
             submenu: [
                 { label: 'Payments', path: '/cashbook/payments' }
             ]
+        },
+        {
+            id: 'gst',
+            label: 'GST',
+            icon: <ReceiptText className="w-5 h-5" />,
+            path: '/gst/invoices'
         },
         {
             id: 'templates',
