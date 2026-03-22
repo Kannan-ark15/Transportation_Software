@@ -248,12 +248,12 @@ const LoadingAdvanceDetail = () => {
                             <Input disabled value={driverBata.toFixed(2)} className="bg-slate-50" />
                         </div>
                         <div className="space-y-1">
-                            <Label className="text-slate-600">Unloading</Label>
+                            <Label className="text-slate-600">Unloading Charges</Label>
                             <Input disabled value={unloading.toFixed(2)} className="bg-slate-50" />
                         </div>
                         <div className="space-y-1">
                             <Label className="text-slate-600">Tarpaulin</Label>
-                            <Input disabled value={tarpaulin.toFixed(2)} className="bg-slate-50" disabled={isContainer} />
+                            <Input disabled value={tarpaulin.toFixed(2)} className="bg-slate-50" />
                         </div>
                         <div className="space-y-1">
                             <Label className="text-slate-600">City Tax</Label>

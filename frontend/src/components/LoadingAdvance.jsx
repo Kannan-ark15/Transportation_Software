@@ -26,13 +26,19 @@ const LoadingAdvance = () => {
     const loginPrefix = (() => { try { return JSON.parse(localStorage.getItem('auth_user') || '{}')?.login_prefix; } catch { return undefined; } })();
     const isContainer = String(form.vehicle_body_type || '').toLowerCase().includes('container');
     const sumIfas = form.invoices.reduce((s, i) => s + (Number(i.quantity) || 0) * (Number(i.kt_freight) || 0), 0);
-    const driverBata = Number(form.driver_bata) || 0, unloading = Number(form.unloading) || 0, tarpaulinVal = isContainer ? 0 : (Number(form.tarpaulin) || 0), cityTax = Number(form.city_tax) || 0, maintenance = Number(form.maintenance) || 0;
-    const expenseSum = driverBata + unloading + tarpaulinVal + cityTax + maintenance;
+    const driverBata = Number(form.driver_bata) || 0;
+    const unloadingRate = Number(form.unloading) || 0;
+    const advanceValue = Number(form.driver_loading_advance) || 0;
+    const unloadingCharges = unloadingRate * advanceValue;
+    const tarpaulinVal = isContainer ? 0 : (Number(form.tarpaulin) || 0);
+    const cityTax = Number(form.city_tax) || 0;
+    const maintenance = Number(form.maintenance) || 0;
+    const expenseSum = driverBata + unloadingCharges + tarpaulinVal + cityTax + maintenance;
     const ownerType = String(form.owner_type || '').toLowerCase(), isCommissioned = ownerType === 'dedicated' || ownerType === 'market', commissionPct = isCommissioned ? 6 : 0;
     const commissionAmt = (sumIfas * commissionPct) / 100;
     const grossAmountVal = isCommissioned ? (commissionAmt - expenseSum) : (sumIfas - expenseSum);
 
-    const predefinedExpenses = (commissionAmt + unloading + tarpaulinVal + cityTax + maintenance).toFixed(2);
+    const predefinedExpenses = (commissionAmt + unloadingCharges + tarpaulinVal + cityTax + maintenance).toFixed(2);
     const fuelAmountVal = (Number(form.fuel_litre) || 0) * (Number(form.fuel_rate) || 0), fuelAmount = fuelAmountVal.toFixed(2);
     const tdsAmount = Number(form.tds) || 0;
     const tripBalance = (sumIfas - (commissionAmt + (Number(form.driver_loading_advance) || 0) + fuelAmountVal + tdsAmount)).toFixed(2);
@@ -129,11 +135,12 @@ const LoadingAdvance = () => {
                                 <div className="space-y-1"><Label>Commission %</Label><Input disabled value={commissionPct.toFixed(2)} /></div>
                                 <div className="space-y-1"><Label>Commission Amount</Label><Input disabled value={commissionAmt.toFixed(2)} /></div>
                                 <div className="space-y-1"><Label className="required">Driver Bata</Label><Input type="number" step="0.01" value={form.driver_bata} onChange={e => setForm(f => ({ ...f, driver_bata: e.target.value }))} /></div>
-                                <div className="space-y-1"><Label className="required">Unloading</Label><Input type="number" step="0.01" value={form.unloading} onChange={e => setForm(f => ({ ...f, unloading: e.target.value }))} /></div>
+                                <div className="space-y-1"><Label className="required">Unloading Charges (Place Master Rate)</Label><Input type="number" step="0.01" value={form.unloading} onChange={e => setForm(f => ({ ...f, unloading: e.target.value }))} /></div>
                                 <div className="space-y-1"><Label>Tarpaulin</Label><Input type="number" step="0.01" disabled={isContainer} value={isContainer ? 0 : form.tarpaulin} onChange={e => setForm(f => ({ ...f, tarpaulin: e.target.value }))} /></div>
                                 <div className="space-y-1"><Label>City Tax</Label><Input type="number" step="0.01" value={form.city_tax} onChange={e => setForm(f => ({ ...f, city_tax: e.target.value }))} /></div>
                                 <div className="space-y-1"><Label>Maintenance</Label><Input type="number" step="0.01" value={form.maintenance} onChange={e => setForm(f => ({ ...f, maintenance: e.target.value }))} /></div>
 
+                                <div className="space-y-1"><Label>Calculated Unloading Charges (Rate x Advance)</Label><Input disabled value={unloadingCharges.toFixed(2)} /></div>
                                 <div className="space-y-1"><Label>Predefined Expenses</Label><Input disabled value={predefinedExpenses} /></div>
                             </CardContent>
                         </Card>
