@@ -13,10 +13,12 @@ import AcknowledgementTable from './AcknowledgementTable';
 const buildAcknowledgementNumber = (invoiceNumber = '') =>
     `ACK${String(invoiceNumber).replace(/\s+/g, '')}`;
 const getSystemDate = () => new Date().toISOString().split('T')[0];
+const isBlank = (value) => value === null || value === undefined || String(value).trim() === '';
 
 const Acknowledgement = () => {
     const [loading, setLoading] = useState(true), [advances, setAdvances] = useState([]);
     const [voucherId, setVoucherId] = useState(''), [voucherInfo, setVoucherInfo] = useState(null), [invoices, setInvoices] = useState([]);
+    const [runMetrics, setRunMetrics] = useState({ last_odometer: '', current_odometer: '' });
     const [modalOpen, setModalOpen] = useState(false), [submitting, setSubmitting] = useState(false), [error, setError] = useState(''), [success, setSuccess] = useState(''), [refreshKey, setRefreshKey] = useState(0);
 
     useEffect(() => { const load = async () => { try { setLoading(true); const res = await loadingAdvanceAPI.getAll(); if (res.success) setAdvances(res.data); } finally { setLoading(false); } }; load(); }, []);
@@ -24,6 +26,15 @@ const Acknowledgement = () => {
     const totalReturned = useMemo(() => invoices.reduce((s, i) => s + (Number(i.returned_amount) || 0), 0), [invoices]);
     const pendingAmount = (totalIfa - totalReturned);
     const voucherStatus = invoices.length && invoices.every(i => i.status === 'Acknowledged') ? 'Ready for Settlement' : 'Pending';
+    const fuelLitre = Number(voucherInfo?.fuel_litre || 0);
+    const hasLastOdometer = !isBlank(runMetrics.last_odometer);
+    const hasCurrentOdometer = !isBlank(runMetrics.current_odometer);
+    const parsedLastOdometer = hasLastOdometer ? Number(runMetrics.last_odometer) : null;
+    const parsedCurrentOdometer = hasCurrentOdometer ? Number(runMetrics.current_odometer) : null;
+    const runKms = hasLastOdometer && hasCurrentOdometer && Number.isFinite(parsedLastOdometer) && Number.isFinite(parsedCurrentOdometer)
+        ? parsedCurrentOdometer - parsedLastOdometer
+        : null;
+    const mileage = runKms === null ? null : (fuelLitre > 0 ? runKms / fuelLitre : 0);
 
     const updateInvoice = (idx, patch) => setInvoices(list => list.map((inv, i) => i === idx ? { ...inv, ...patch } : inv));
     const setStatus = (idx, status) => {
@@ -35,6 +46,7 @@ const Acknowledgement = () => {
         setVoucherId(id);
         setError('');
         setSuccess('');
+        setRunMetrics({ last_odometer: '', current_odometer: '' });
         const v = advances.find(a => String(a.id) === String(id));
         setVoucherInfo(v || null);
         if (!id) return setInvoices([]);
@@ -55,16 +67,47 @@ const Acknowledgement = () => {
             setInvoices([]);
         }
     };
-    const validate = () => { if (!voucherInfo) return 'Please select a voucher'; if (!invoices.length) return 'No invoices found'; for (const inv of invoices) { const ifa = Number(inv.ifa_amount || 0); const ret = Number(inv.returned_amount || 0); if (inv.status === 'Acknowledged' && Math.abs(ret - ifa) > 0.01) return `Returned amount must equal IFA for ${inv.invoice_number}`; if (inv.status === 'Shortage' && !(ret > 0 && ret < ifa)) return `Returned amount must be less than IFA for ${inv.invoice_number}`; if (inv.status === 'Pending' && ret !== 0) return `Returned amount must be 0 for ${inv.invoice_number}`; } if (pendingAmount < 0) return 'Total returned exceeds total IFA'; return ''; };
+    const validate = () => {
+        if (!voucherInfo) return 'Please select a voucher';
+        if (!invoices.length) return 'No invoices found';
+        for (const inv of invoices) {
+            const ifa = Number(inv.ifa_amount || 0);
+            const ret = Number(inv.returned_amount || 0);
+            if (inv.status === 'Acknowledged' && Math.abs(ret - ifa) > 0.01) return `Returned amount must equal IFA for ${inv.invoice_number}`;
+            if (inv.status === 'Shortage' && !(ret > 0 && ret < ifa)) return `Returned amount must be less than IFA for ${inv.invoice_number}`;
+            if (inv.status === 'Pending' && ret !== 0) return `Returned amount must be 0 for ${inv.invoice_number}`;
+        }
+        if (pendingAmount < 0) return 'Total returned exceeds total IFA';
+        if (hasLastOdometer !== hasCurrentOdometer) return 'Please enter both Last Odometer and Current Odometer';
+        if (hasLastOdometer && hasCurrentOdometer) {
+            if (!Number.isFinite(parsedLastOdometer) || !Number.isFinite(parsedCurrentOdometer)) return 'Odometer values must be valid numbers';
+            if (parsedLastOdometer < 0 || parsedCurrentOdometer < 0) return 'Odometer values cannot be negative';
+            if (parsedCurrentOdometer < parsedLastOdometer) return 'Current Odometer must be greater than or equal to Last Odometer';
+        }
+        return '';
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         const v = validate(); if (v) return setError(v);
         try {
             setSubmitting(true);
-            const payload = { loading_advance_id: voucherInfo.id, items: invoices.map(i => ({ loading_advance_invoice_id: i.id, status: i.status, returned_amount: i.returned_amount })) };
+            const payload = {
+                loading_advance_id: voucherInfo.id,
+                last_odometer: hasLastOdometer ? parsedLastOdometer : null,
+                current_odometer: hasCurrentOdometer ? parsedCurrentOdometer : null,
+                items: invoices.map(i => ({ loading_advance_invoice_id: i.id, status: i.status, returned_amount: i.returned_amount }))
+            };
             const res = await acknowledgementAPI.create(payload);
-            if (res.success) { setSuccess('Acknowledgement saved'); setModalOpen(false); setVoucherId(''); setVoucherInfo(null); setInvoices([]); setRefreshKey(k => k + 1); }
+            if (res.success) {
+                setSuccess('Acknowledgement saved');
+                setModalOpen(false);
+                setVoucherId('');
+                setVoucherInfo(null);
+                setInvoices([]);
+                setRunMetrics({ last_odometer: '', current_odometer: '' });
+                setRefreshKey(k => k + 1);
+            }
         } catch (err) { setError(err.response?.data?.message || 'Save failed'); }
         finally { setSubmitting(false); }
     };
@@ -72,7 +115,7 @@ const Acknowledgement = () => {
     if (loading) return (<div className="flex flex-col items-center justify-center min-h-[300px] text-slate-500"><Loader2 className="h-10 w-10 animate-spin text-blue-600 mb-3" /><p className="text-base font-medium">Loading vouchers...</p></div>);
     return (
         <div className="space-y-6">
-            <div className="flex justify-end"><Button onClick={() => { setModalOpen(true); setError(''); setSuccess(''); }} className="bg-blue-600 hover:bg-blue-700">Add Acknowledgement</Button></div>
+            <div className="flex justify-end"><Button onClick={() => { setModalOpen(true); setError(''); setSuccess(''); setRunMetrics({ last_odometer: '', current_odometer: '' }); }} className="bg-blue-600 hover:bg-blue-700">Add Acknowledgement</Button></div>
             <Dialog open={modalOpen} onOpenChange={setModalOpen}>
                 <DialogContent className="max-w-5xl">
                     <DialogHeader><DialogTitle>Acknowledgement</DialogTitle></DialogHeader>
@@ -148,6 +191,14 @@ const Acknowledgement = () => {
                                 </div>
                             </CardContent>
                         </Card>
+                        <Card className="border border-slate-100 shadow-none"><CardHeader className="pb-2 bg-accent/10 border-b border-accent/20 rounded-t-lg"><CardTitle className="text-lg text-accent">Run Metrics</CardTitle></CardHeader>
+                            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1"><Label>Last Odometer</Label><Input type="number" step="0.001" value={runMetrics.last_odometer} onChange={e => setRunMetrics(m => ({ ...m, last_odometer: e.target.value }))} /></div>
+                                <div className="space-y-1"><Label>Current Odometer</Label><Input type="number" step="0.001" value={runMetrics.current_odometer} onChange={e => setRunMetrics(m => ({ ...m, current_odometer: e.target.value }))} /></div>
+                                <div className="space-y-1"><Label>Run Kms</Label><Input disabled value={runKms === null ? '' : runKms.toFixed(3)} /></div>
+                                <div className="space-y-1"><Label>Mileage</Label><Input disabled value={mileage === null ? '' : mileage.toFixed(3)} /></div>
+                            </CardContent>
+                        </Card>
                         <Card className="border border-slate-100 shadow-none"><CardHeader className="pb-2 bg-accent/10 border-b border-accent/20 rounded-t-lg"><CardTitle className="text-lg text-accent">Voucher Summary</CardTitle></CardHeader>
                             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-1"><Label>Voucher Pending Amount</Label><Input disabled value={pendingAmount.toFixed(2)} /></div>
@@ -158,7 +209,7 @@ const Acknowledgement = () => {
                                 </div>
                             </CardContent>
                         </Card>
-                        <div className="flex justify-end gap-2 pt-2"><Button type="button" variant="outline" onClick={() => { setVoucherId(''); setVoucherInfo(null); setInvoices([]); }} disabled={submitting}>Clear</Button><Button type="submit" disabled={submitting || !voucherId}>{submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Save</Button></div>
+                        <div className="flex justify-end gap-2 pt-2"><Button type="button" variant="outline" onClick={() => { setVoucherId(''); setVoucherInfo(null); setInvoices([]); setRunMetrics({ last_odometer: '', current_odometer: '' }); }} disabled={submitting}>Clear</Button><Button type="submit" disabled={submitting || !voucherId}>{submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Save</Button></div>
                     </form>
                 </DialogContent>
             </Dialog>

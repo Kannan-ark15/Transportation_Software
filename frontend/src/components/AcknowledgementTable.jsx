@@ -49,6 +49,8 @@ const AcknowledgementTable = ({ refreshKey = 0 }) => {
                                     <TableHead>Vehicle No</TableHead>
                                     <TableHead>Voucher Status</TableHead>
                                     <TableHead>Pending Amount</TableHead>
+                                    <TableHead>Run Kms</TableHead>
+                                    <TableHead>Mileage</TableHead>
                                     <TableHead>Pending/Shortage Invoices</TableHead>
                                     <TableHead>Date</TableHead>
                                 </TableRow>
@@ -61,6 +63,8 @@ const AcknowledgementTable = ({ refreshKey = 0 }) => {
                                         <TableCell>{r.vehicle_registration_number || '-'}</TableCell>
                                         <TableCell>{r.voucher_status}</TableCell>
                                         <TableCell>{Number(r.voucher_pending_amount || 0).toFixed(2)}</TableCell>
+                                        <TableCell>{r.run_kms === null || r.run_kms === undefined ? '-' : Number(r.run_kms).toFixed(3)}</TableCell>
+                                        <TableCell>{r.mileage === null || r.mileage === undefined ? '-' : Number(r.mileage).toFixed(3)}</TableCell>
                                         <TableCell>{r.pending_shortage_invoice_numbers || '-'}</TableCell>
                                         <TableCell className="text-xs">{r.created_at ? new Date(r.created_at).toLocaleDateString() : '-'}</TableCell>
                                     </TableRow>

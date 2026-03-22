@@ -4,11 +4,13 @@ const statuses = new Set(['Acknowledged', 'Shortage', 'Pending']);
 const nearlyEqual = (a, b, eps = 0.01) => Math.abs(a - b) < eps;
 const buildAcknowledgementNumber = (invoiceNumber = '') =>
     `ACK${String(invoiceNumber).replace(/\s+/g, '')}`;
+const isBlank = (value) => value === null || value === undefined || String(value).trim() === '';
 
 const getAllAcknowledgements = async (req, res, next) => {
     try {
         const result = await pool.query(
-            `SELECT a.id, a.loading_advance_id, a.voucher_number, a.voucher_status, a.voucher_pending_amount, a.created_at,
+            `SELECT a.id, a.loading_advance_id, a.voucher_number, a.voucher_status, a.voucher_pending_amount,
+                    a.last_odometer, a.current_odometer, a.run_kms, a.mileage, a.created_at,
                     la.vehicle_registration_number, la.voucher_datetime,
                     COALESCE(
                         (
@@ -31,14 +33,40 @@ const createAcknowledgement = async (req, res, next) => {
     const client = await pool.connect();
     let inTx = false;
     try {
-        const { loading_advance_id, items = [] } = req.body;
+        const { loading_advance_id, items = [], last_odometer, current_odometer } = req.body;
         if (!loading_advance_id) return res.status(400).json({ success: false, message: 'loading_advance_id is required' });
         if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ success: false, message: 'At least one invoice is required' });
 
-        const laRes = await client.query('SELECT id, voucher_number FROM loading_advances WHERE id = $1', [loading_advance_id]);
+        const laRes = await client.query('SELECT id, voucher_number, fuel_litre FROM loading_advances WHERE id = $1', [loading_advance_id]);
         if (laRes.rows.length === 0) return res.status(400).json({ success: false, message: 'Invalid voucher selection' });
         const exists = await client.query('SELECT 1 FROM acknowledgements WHERE loading_advance_id = $1', [loading_advance_id]);
         if (exists.rows.length) return res.status(400).json({ success: false, message: 'Acknowledgement already exists for this voucher' });
+
+        const hasLastOdometer = !isBlank(last_odometer);
+        const hasCurrentOdometer = !isBlank(current_odometer);
+        if (hasLastOdometer !== hasCurrentOdometer) {
+            return res.status(400).json({ success: false, message: 'Both last_odometer and current_odometer are required together' });
+        }
+        let parsedLastOdometer = null;
+        let parsedCurrentOdometer = null;
+        let runKms = null;
+        let mileage = null;
+        if (hasLastOdometer && hasCurrentOdometer) {
+            parsedLastOdometer = Number(last_odometer);
+            parsedCurrentOdometer = Number(current_odometer);
+            if (!Number.isFinite(parsedLastOdometer) || !Number.isFinite(parsedCurrentOdometer)) {
+                return res.status(400).json({ success: false, message: 'Odometer values must be valid numbers' });
+            }
+            if (parsedLastOdometer < 0 || parsedCurrentOdometer < 0) {
+                return res.status(400).json({ success: false, message: 'Odometer values cannot be negative' });
+            }
+            if (parsedCurrentOdometer < parsedLastOdometer) {
+                return res.status(400).json({ success: false, message: 'Current odometer must be greater than or equal to last odometer' });
+            }
+            const parsedFuelLitre = Number(laRes.rows[0].fuel_litre) || 0;
+            runKms = Number((parsedCurrentOdometer - parsedLastOdometer).toFixed(3));
+            mileage = Number((parsedFuelLitre > 0 ? (runKms / parsedFuelLitre) : 0).toFixed(3));
+        }
 
         const invRes = await client.query(
             'SELECT id, invoice_number, dealer_name, to_place, quantity, ifa_amount FROM loading_advance_invoices WHERE loading_advance_id = $1 ORDER BY id',
@@ -81,9 +109,10 @@ const createAcknowledgement = async (req, res, next) => {
         await client.query('BEGIN');
         inTx = true;
         const ackRes = await client.query(
-            `INSERT INTO acknowledgements (loading_advance_id, voucher_number, voucher_status, voucher_pending_amount)
-             VALUES ($1,$2,$3,$4) RETURNING *`,
-            [loading_advance_id, laRes.rows[0].voucher_number, voucher_status, voucher_pending_amount]
+            `INSERT INTO acknowledgements
+                (loading_advance_id, voucher_number, voucher_status, voucher_pending_amount, last_odometer, current_odometer, run_kms, mileage)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+            [loading_advance_id, laRes.rows[0].voucher_number, voucher_status, voucher_pending_amount, parsedLastOdometer, parsedCurrentOdometer, runKms, mileage]
         );
         const ackId = ackRes.rows[0].id;
         const insert = `INSERT INTO acknowledgement_invoices

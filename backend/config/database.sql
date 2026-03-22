@@ -198,6 +198,10 @@ CREATE TABLE IF NOT EXISTS acknowledgements (
     voucher_number VARCHAR(20) NOT NULL,
     voucher_status VARCHAR(20) NOT NULL CHECK (voucher_status IN ('Pending', 'Ready for Settlement')),
     voucher_pending_amount DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    last_odometer DECIMAL(12, 3),
+    current_odometer DECIMAL(12, 3),
+    run_kms DECIMAL(12, 3),
+    mileage DECIMAL(12, 3),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -246,6 +250,11 @@ WHERE acknowledgement_date IS NULL;
 ALTER TABLE IF EXISTS acknowledgement_invoices ALTER COLUMN dealer_name SET NOT NULL;
 ALTER TABLE IF EXISTS acknowledgement_invoices ALTER COLUMN acknowledgement_number SET NOT NULL;
 ALTER TABLE IF EXISTS acknowledgement_invoices ALTER COLUMN acknowledgement_date SET NOT NULL;
+
+ALTER TABLE IF EXISTS acknowledgements ADD COLUMN IF NOT EXISTS last_odometer DECIMAL(12, 3);
+ALTER TABLE IF EXISTS acknowledgements ADD COLUMN IF NOT EXISTS current_odometer DECIMAL(12, 3);
+ALTER TABLE IF EXISTS acknowledgements ADD COLUMN IF NOT EXISTS run_kms DECIMAL(12, 3);
+ALTER TABLE IF EXISTS acknowledgements ADD COLUMN IF NOT EXISTS mileage DECIMAL(12, 3);
 
 UPDATE acknowledgements
 SET voucher_status = 'Ready for Settlement'
