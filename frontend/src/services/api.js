@@ -132,6 +132,17 @@ export const cashbookPaymentAPI = {
     }
 };
 
+export const reminderDashboardAPI = {
+    getAll: async () => {
+        const response = await api.get('/reminder-dashboard');
+        return response.data;
+    },
+    updateStatus: async (data) => {
+        const response = await api.patch('/reminder-dashboard/status', data);
+        return response.data;
+    }
+};
+
 export const authAPI = {
     register: async (data) => {
         const response = await api.post('/auth/register', data);

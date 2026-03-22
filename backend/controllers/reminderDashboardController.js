@@ -67,7 +67,7 @@ const getReminderDashboard = async (req, res, next) => {
 
                 -- Advances and Loans: Loan repayment installments
                 SELECT
-                    'Advances and Loans'::TEXT AS category,
+                    'Loans & Advances'::TEXT AS category,
                     'Loan Installment'::TEXT AS item,
                     (
                         COALESCE(v.vehicle_no, lm.vehicle_number, '-') ||

@@ -139,6 +139,12 @@ const Sidebar = () => {
             ]
         },
         {
+            id: 'compliance-reminder',
+            label: 'Compliance',
+            icon: <FileText className="w-5 h-5" />,
+            path: '/compliance-payment-reminder'
+        },
+        {
             id: 'advances-loans',
             label: 'Advances and Loans',
             icon: <Landmark className="w-5 h-5" />,

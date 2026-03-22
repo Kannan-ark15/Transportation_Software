@@ -20,6 +20,7 @@ const ownVehicleSettlementRoutes = require('./routes/ownVehicleSettlementRoutes'
 const loanMasterRoutes = require('./routes/loanMasterRoutes');
 const loanRepaymentRoutes = require('./routes/loanRepaymentRoutes');
 const cashbookPaymentRoutes = require('./routes/cashbookPaymentRoutes');
+const reminderDashboardRoutes = require('./routes/reminderDashboardRoutes');
 const templateRoutes = require('./routes/templateRoutes');
 const authRoutes = require('./routes/authRoutes');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
@@ -69,6 +70,7 @@ app.use('/api/own-vehicle-settlements', ownVehicleSettlementRoutes);
 app.use('/api/loan-masters', loanMasterRoutes);
 app.use('/api/loan-repayments', loanRepaymentRoutes);
 app.use('/api/cashbook-payments', cashbookPaymentRoutes);
+app.use('/api/reminder-dashboard', reminderDashboardRoutes);
 app.use('/api/templates', templateRoutes);
 app.use('/api/auth', authRoutes);
 

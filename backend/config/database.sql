@@ -270,6 +270,19 @@ CREATE TRIGGER update_acknowledgements_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
+-- Reminder Dashboard status (for manual Settled / Not Settled tracking)
+CREATE TABLE IF NOT EXISTS reminder_statuses (
+    reminder_key TEXT PRIMARY KEY,
+    is_settled BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TRIGGER update_reminder_statuses_updated_at
+    BEFORE UPDATE ON reminder_statuses
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
 -- Dedicated & Market Vehicle Balance Settlement (Transactions)
 CREATE TABLE IF NOT EXISTS dedicated_market_settlements (
     id SERIAL PRIMARY KEY,

@@ -24,6 +24,7 @@ import BalanceSettlement from './components/BalanceSettlement';
 import LoanMaster from './components/LoanMaster';
 import LoanRepayment from './components/LoanRepayment';
 import CashbookPayments from './components/CashbookPayments';
+import CompliancePaymentReminder from './components/CompliancePaymentReminder';
 import GlobalDialogProvider from './components/common/GlobalDialogProvider';
 
 function App() {
@@ -65,6 +66,8 @@ function App() {
                             <Route path="/transactions/loading-advance/:id" element={<LoadingAdvanceDetail />} />
                             <Route path="/transactions/acknowledgement" element={<Acknowledgement />} />
                             <Route path="/transactions/balance-settlement" element={<BalanceSettlement />} />
+                            <Route path="/transactions/compliance-payment-reminder" element={<Navigate to="/compliance-payment-reminder" replace />} />
+                            <Route path="/compliance-payment-reminder" element={<CompliancePaymentReminder />} />
                             <Route path="/transactions/dedicated-market-settlement" element={<DedicatedMarketSettlement />} />
                             <Route path="/transactions/own-vehicle-settlement" element={<OwnVehicleSettlement />} />
                             <Route path="/advances-loans/loan-master" element={<LoanMaster />} />
