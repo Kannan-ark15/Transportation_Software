@@ -237,7 +237,14 @@ const fetchPaymentById = async (client, id) => {
 const getCashbookMeta = async (req, res, next) => {
     try {
         const [vehiclesRes, driverPayableRes, ownerPayableRes, dueSettlementRes, insuranceRes] = await Promise.all([
-            pool.query('SELECT id, vehicle_no FROM vehicles ORDER BY vehicle_no ASC'),
+            pool.query(
+                `SELECT
+                    id,
+                    vehicle_no,
+                    own_dedicated
+                 FROM vehicles
+                 ORDER BY vehicle_no ASC`
+            ),
             pool.query(
                 `SELECT
                     s.id,

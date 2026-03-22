@@ -20,7 +20,9 @@ const Pagination = ({
     totalItems,
     itemsPerPage,
     onPageChange,
-    onItemsPerPageChange
+    onItemsPerPageChange,
+    itemsPerPageOptions = [10, 25, 50, 100],
+    showItemsPerPageSelector = true
 }) => {
     const totalPages = Math.ceil(totalItems / itemsPerPage);
 
@@ -113,23 +115,26 @@ const Pagination = ({
                     </Button>
                 </div>
 
-                <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground font-medium">Show</span>
-                    <Select
-                        value={itemsPerPage.toString()}
-                        onValueChange={(val) => onItemsPerPageChange(parseInt(val))}
-                    >
-                        <SelectTrigger className="h-8 w-[70px] bg-white/70 border-border/60">
-                            <SelectValue placeholder={itemsPerPage} />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="10">10</SelectItem>
-                            <SelectItem value="25">25</SelectItem>
-                            <SelectItem value="50">50</SelectItem>
-                            <SelectItem value="100">100</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
+                {showItemsPerPageSelector && (
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground font-medium">Show</span>
+                        <Select
+                            value={itemsPerPage.toString()}
+                            onValueChange={(val) => onItemsPerPageChange(parseInt(val))}
+                        >
+                            <SelectTrigger className="h-8 w-[70px] bg-white/70 border-border/60">
+                                <SelectValue placeholder={itemsPerPage} />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {itemsPerPageOptions.map((option) => (
+                                    <SelectItem key={String(option)} value={String(option)}>
+                                        {option}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                )}
             </div>
         </div>
     );

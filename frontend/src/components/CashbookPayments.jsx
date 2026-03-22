@@ -53,6 +53,13 @@ const REFERENCE_MODULES_BY_CATEGORY = {
     'Masters': ['Insurance']
 };
 
+const getTransactionModuleByVehicleType = (vehicle) => {
+    const vehicleType = String(vehicle?.own_dedicated || '').trim().toLowerCase();
+    if (vehicleType === 'own') return 'Driver Salary Payable';
+    if (vehicleType === 'dedicated' || vehicleType === 'market') return 'Dedicated Owner Payable';
+    return '';
+};
+
 const emptyForm = {
     payment_date: '',
     vehicle_id: '',
@@ -126,6 +133,24 @@ const CashbookPayments = () => {
     }, []);
 
     const availableModules = REFERENCE_MODULES_BY_CATEGORY[formData.payment_category] || [];
+    const selectedVehicleForModule = useMemo(
+        () => vehicles.find((v) => String(v.id) === String(formData.vehicle_id)),
+        [vehicles, formData.vehicle_id]
+    );
+    const constrainedTransactionModule = useMemo(
+        () => getTransactionModuleByVehicleType(selectedVehicleForModule),
+        [selectedVehicleForModule]
+    );
+    const displayModules = useMemo(() => {
+        if (formData.payment_category !== 'Transactions') return availableModules;
+        if (!constrainedTransactionModule) return availableModules;
+        if (formData.reference_module && formData.reference_module !== constrainedTransactionModule) {
+            return [formData.reference_module, constrainedTransactionModule];
+        }
+        return [constrainedTransactionModule];
+    }, [formData.payment_category, availableModules, constrainedTransactionModule, formData.reference_module]);
+
+    const selectedVehicleId = String(formData.vehicle_id || '').trim();
 
     const referenceOptions = useMemo(() => {
         let options = [];
@@ -142,7 +167,11 @@ const CashbookPayments = () => {
                 label: `Owner ${row.owner_name || 'NA'} | Vehicles: ${row.vehicle_numbers || 'NA'} | Amount ${formatMoney(row.settlement_balance)}`
             }));
         } else if (formData.reference_module === 'Due Settlement') {
-            options = dueSettlements.map((row) => ({
+            const scopedDueSettlements = selectedVehicleId
+                ? dueSettlements.filter((row) => String(row.vehicle_id || '') === selectedVehicleId)
+                : dueSettlements;
+
+            options = scopedDueSettlements.map((row) => ({
                 id: row.id,
                 amount: row.due_amount,
                 vehicle_id: row.vehicle_id,
@@ -172,6 +201,7 @@ const CashbookPayments = () => {
         return options;
     }, [
         formData.reference_module,
+        selectedVehicleId,
         formData.reference_record_id,
         driverSalaryPayables,
         dedicatedOwnerPayables,
@@ -240,9 +270,28 @@ const CashbookPayments = () => {
                     next.reference_module = '';
                     next.reference_record_id = '';
                 }
+                if (value === 'Transactions' && next.vehicle_id) {
+                    const selectedVehicle = vehicles.find((v) => String(v.id) === String(next.vehicle_id));
+                    const preferredModule = getTransactionModuleByVehicleType(selectedVehicle);
+                    if (preferredModule) {
+                        next.reference_module = preferredModule;
+                        next.reference_record_id = '';
+                    }
+                }
             }
             if (field === 'reference_module') {
                 next.reference_record_id = '';
+            }
+            if (field === 'vehicle_id' && next.reference_module === 'Due Settlement') {
+                next.reference_record_id = '';
+            }
+            if (field === 'vehicle_id' && next.payment_category === 'Transactions') {
+                const selectedVehicle = vehicles.find((v) => String(v.id) === String(value));
+                const preferredModule = getTransactionModuleByVehicleType(selectedVehicle);
+                if (preferredModule && preferredModule !== next.reference_module) {
+                    next.reference_module = preferredModule;
+                    next.reference_record_id = '';
+                }
             }
             return next;
         });
@@ -579,7 +628,7 @@ const CashbookPayments = () => {
                                                 <SelectValue placeholder="Select module" />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                {availableModules.map((module) => (
+                                                {displayModules.map((module) => (
                                                     <SelectItem key={module} value={module}>
                                                         {module}
                                                     </SelectItem>

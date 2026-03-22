@@ -97,6 +97,27 @@ const getNodeText = (node) => {
     return ""
 }
 
+const getTypeName = (type) => {
+    if (!type) return ""
+    if (typeof type === "string") return type
+    return type.displayName || type.name || type.render?.displayName || type.render?.name || ""
+}
+
+const isTypeMatch = (nodeType, componentType) => {
+    if (nodeType === componentType) return true
+
+    const nodeName = getTypeName(nodeType)
+    const componentName = getTypeName(componentType)
+    if (!nodeName || !componentName) return false
+
+    // React Fast Refresh can proxy component identities; display names remain stable.
+    return nodeName === componentName
+}
+
+const stopKeyboardPropagation = (event) => {
+    event.stopPropagation()
+}
+
 const filterSelectChildren = (children, query) => {
     const q = query.trim().toLowerCase()
     const nodes = React.Children.toArray(children)
@@ -106,7 +127,15 @@ const filterSelectChildren = (children, query) => {
     nodes.forEach((node) => {
         if (!React.isValidElement(node)) return
 
-        if (node.type === SelectGroup) {
+        if (node.type === React.Fragment) {
+            const fragmentChildren = filterSelectChildren(node.props.children, q)
+            if (fragmentChildren.length > 0) {
+                filtered.push(React.cloneElement(node, { children: fragmentChildren }))
+            }
+            return
+        }
+
+        if (isTypeMatch(node.type, SelectGroup)) {
             const groupChildren = filterSelectChildren(node.props.children, q)
             if (groupChildren.length > 0) {
                 filtered.push(React.cloneElement(node, { children: groupChildren }))
@@ -114,11 +143,11 @@ const filterSelectChildren = (children, query) => {
             return
         }
 
-        if (node.type === SelectSeparator || node.type === SelectLabel) {
+        if (isTypeMatch(node.type, SelectSeparator) || isTypeMatch(node.type, SelectLabel)) {
             return
         }
 
-        if (node.type === SelectItem) {
+        if (isTypeMatch(node.type, SelectItem)) {
             const text = getNodeText(node.props.children).toLowerCase()
             if (text.includes(q)) {
                 filtered.push(node)
@@ -126,7 +155,18 @@ const filterSelectChildren = (children, query) => {
             return
         }
 
-        filtered.push(node)
+        if (node.props?.children) {
+            const nestedChildren = filterSelectChildren(node.props.children, q)
+            if (nestedChildren.length > 0) {
+                filtered.push(React.cloneElement(node, { children: nestedChildren }))
+                return
+            }
+        }
+
+        const text = getNodeText(node.props?.children).toLowerCase()
+        if (text.includes(q)) {
+            filtered.push(node)
+        }
     })
 
     return filtered
@@ -170,7 +210,9 @@ const SelectContent = React.forwardRef(
                                 onChange={(event) => setSearchValue(event.target.value)}
                                 placeholder={searchPlaceholder}
                                 className="h-9 rounded-full bg-white/80 border-border/60 text-sm shadow-soft-inset"
-                                onKeyDown={(event) => event.stopPropagation()}
+                                onKeyDown={stopKeyboardPropagation}
+                                onKeyDownCapture={stopKeyboardPropagation}
+                                onKeyUpCapture={stopKeyboardPropagation}
                                 autoFocus
                             />
                         </div>

@@ -65,6 +65,108 @@ const getReminderDashboard = async (req, res, next) => {
 
                 UNION ALL
 
+                -- Masters: Vehicle insurance payable (auto-settled via Cashbook Insurance payments)
+                SELECT
+                    'Masters'::TEXT AS category,
+                    'Vehicle Insurance'::TEXT AS item,
+                    (
+                        COALESCE(v.vehicle_no, '-') ||
+                        CASE
+                            WHEN COALESCE(v.insurance_no, '') <> '' THEN ' / Policy ' || v.insurance_no
+                            ELSE ''
+                        END
+                    )::TEXT AS vehicle_party,
+                    COALESCE(v.permit_till_date, v.fc_till_date, v.pollution_expiry_date)::DATE AS due_date,
+                    v.insurance_amount::DECIMAL(12, 2) AS amount,
+                    (COALESCE(cp.amount_paid, 0) >= COALESCE(v.insurance_amount, 0)) AS default_settled,
+                    COALESCE(v.updated_at, v.created_at, CURRENT_TIMESTAMP) AS fifo_order_ts,
+                    ('MASTER_VEHICLE_INSURANCE_' || v.id)::TEXT AS reminder_key
+                FROM vehicles v
+                LEFT JOIN (
+                    SELECT
+                        reference_record_id,
+                        MAX(amount_paid) AS amount_paid
+                    FROM cashbook_payments
+                    WHERE reference_module = 'Insurance'
+                    GROUP BY reference_record_id
+                ) cp ON cp.reference_record_id = v.id
+                WHERE COALESCE(v.status, 'Active') = 'Active'
+                  AND COALESCE(v.insurance_amount, 0) > 0
+
+                UNION ALL
+
+                -- Transactions: Own vehicle driver salary payable (auto-settled via Cashbook)
+                SELECT
+                    'Transactions'::TEXT AS category,
+                    'Driver Salary Payable'::TEXT AS item,
+                    (
+                        COALESCE(s.driver_name, '-') ||
+                        CASE
+                            WHEN COALESCE(sv.vehicle_numbers, '') <> '' THEN ' | Vehicles: ' || sv.vehicle_numbers
+                            ELSE ''
+                        END
+                    )::TEXT AS vehicle_party,
+                    COALESCE(s.settled_at, s.created_at)::DATE AS due_date,
+                    s.driver_salary_payable::DECIMAL(12, 2) AS amount,
+                    (COALESCE(cp.amount_paid, 0) >= COALESCE(s.driver_salary_payable, 0)) AS default_settled,
+                    COALESCE(s.created_at, CURRENT_TIMESTAMP) AS fifo_order_ts,
+                    ('TX_DRIVER_SALARY_' || s.id)::TEXT AS reminder_key
+                FROM own_vehicle_settlements s
+                LEFT JOIN (
+                    SELECT
+                        settlement_id,
+                        COALESCE(string_agg(DISTINCT vehicle_number, ', ' ORDER BY vehicle_number), '') AS vehicle_numbers
+                    FROM own_vehicle_settlement_vouchers
+                    GROUP BY settlement_id
+                ) sv ON sv.settlement_id = s.id
+                LEFT JOIN (
+                    SELECT
+                        reference_record_id,
+                        MAX(amount_paid) AS amount_paid
+                    FROM cashbook_payments
+                    WHERE reference_module = 'Driver Salary Payable'
+                    GROUP BY reference_record_id
+                ) cp ON cp.reference_record_id = s.id
+                WHERE COALESCE(s.driver_salary_payable, 0) > 0
+
+                UNION ALL
+
+                -- Transactions: Dedicated owner payable (auto-settled via Cashbook)
+                SELECT
+                    'Transactions'::TEXT AS category,
+                    'Dedicated Owner Payable'::TEXT AS item,
+                    (
+                        COALESCE(s.owner_name, '-') ||
+                        CASE
+                            WHEN COALESCE(sv.vehicle_numbers, '') <> '' THEN ' | Vehicles: ' || sv.vehicle_numbers
+                            ELSE ''
+                        END
+                    )::TEXT AS vehicle_party,
+                    COALESCE(s.settled_at, s.created_at)::DATE AS due_date,
+                    s.settlement_balance::DECIMAL(12, 2) AS amount,
+                    (COALESCE(cp.amount_paid, 0) >= COALESCE(s.settlement_balance, 0)) AS default_settled,
+                    COALESCE(s.created_at, CURRENT_TIMESTAMP) AS fifo_order_ts,
+                    ('TX_DEDICATED_OWNER_' || s.id)::TEXT AS reminder_key
+                FROM dedicated_market_settlements s
+                LEFT JOIN (
+                    SELECT
+                        settlement_id,
+                        COALESCE(string_agg(DISTINCT vehicle_number, ', ' ORDER BY vehicle_number), '') AS vehicle_numbers
+                    FROM dedicated_market_settlement_vouchers
+                    GROUP BY settlement_id
+                ) sv ON sv.settlement_id = s.id
+                LEFT JOIN (
+                    SELECT
+                        reference_record_id,
+                        MAX(amount_paid) AS amount_paid
+                    FROM cashbook_payments
+                    WHERE reference_module = 'Dedicated Owner Payable'
+                    GROUP BY reference_record_id
+                ) cp ON cp.reference_record_id = s.id
+                WHERE COALESCE(s.settlement_balance, 0) > 0
+
+                UNION ALL
+
                 -- Advances and Loans: Loan repayment installments
                 SELECT
                     'Loans & Advances'::TEXT AS category,
@@ -109,18 +211,36 @@ const getReminderDashboard = async (req, res, next) => {
                 WHERE ai.status IN ('Pending', 'Shortage')
                   AND ai.acknowledgement_date IS NOT NULL
             )
+            ),
+            resolved_reminders AS (
+                SELECT
+                    rs.category,
+                    rs.item,
+                    rs.vehicle_party,
+                    rs.due_date,
+                    (rs.due_date - CURRENT_DATE)::INT AS days_remaining,
+                    rs.amount,
+                    CASE
+                        WHEN rs.default_settled THEN TRUE
+                        ELSE COALESCE(rst.is_settled, FALSE)
+                    END AS is_settled,
+                    rs.reminder_key,
+                    rs.fifo_order_ts
+                FROM reminder_sources rs
+                LEFT JOIN reminder_statuses rst ON rst.reminder_key = rs.reminder_key
+            )
             SELECT
-                rs.category,
-                rs.item,
-                rs.vehicle_party,
-                rs.due_date,
-                (rs.due_date - CURRENT_DATE)::INT AS days_remaining,
-                rs.amount,
-                COALESCE(rst.is_settled, rs.default_settled, FALSE) AS is_settled,
-                rs.reminder_key
-            FROM reminder_sources rs
-            LEFT JOIN reminder_statuses rst ON rst.reminder_key = rs.reminder_key
-            ORDER BY rs.due_date ASC, rs.fifo_order_ts ASC, rs.reminder_key ASC`
+                category,
+                item,
+                vehicle_party,
+                due_date,
+                days_remaining,
+                amount,
+                is_settled,
+                reminder_key
+            FROM resolved_reminders
+            WHERE is_settled = FALSE
+            ORDER BY due_date ASC, fifo_order_ts ASC, reminder_key ASC`
         );
 
         res.status(200).json({ success: true, data: result.rows });
