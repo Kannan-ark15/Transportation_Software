@@ -163,6 +163,14 @@ export const purchaseGstTrackerAPI = {
     }
 };
 
+export const itcLedgerAPI = {
+    ...generateCRUD('/itc-ledger'),
+    getMeta: async () => {
+        const response = await api.get('/itc-ledger/meta');
+        return response.data;
+    }
+};
+
 export const authAPI = {
     register: async (data) => {
         const response = await api.post('/auth/register', data);

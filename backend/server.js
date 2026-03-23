@@ -23,6 +23,7 @@ const cashbookPaymentRoutes = require('./routes/cashbookPaymentRoutes');
 const reminderDashboardRoutes = require('./routes/reminderDashboardRoutes');
 const gstInvoiceRoutes = require('./routes/gstInvoiceRoutes');
 const purchaseGstTrackerRoutes = require('./routes/purchaseGstTrackerRoutes');
+const itcLedgerRoutes = require('./routes/itcLedgerRoutes');
 const templateRoutes = require('./routes/templateRoutes');
 const authRoutes = require('./routes/authRoutes');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
@@ -75,6 +76,7 @@ app.use('/api/cashbook-payments', cashbookPaymentRoutes);
 app.use('/api/reminder-dashboard', reminderDashboardRoutes);
 app.use('/api/gst-invoices', gstInvoiceRoutes);
 app.use('/api/purchase-gst-tracker', purchaseGstTrackerRoutes);
+app.use('/api/itc-ledger', itcLedgerRoutes);
 app.use('/api/templates', templateRoutes);
 app.use('/api/auth', authRoutes);
 
