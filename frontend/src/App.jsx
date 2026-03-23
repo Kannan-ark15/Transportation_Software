@@ -26,6 +26,7 @@ import LoanRepayment from './components/LoanRepayment';
 import CashbookPayments from './components/CashbookPayments';
 import CompliancePaymentReminder from './components/CompliancePaymentReminder';
 import GstInvoices from './components/GstInvoices';
+import PurchaseGstTracker from './components/PurchaseGstTracker';
 import GlobalDialogProvider from './components/common/GlobalDialogProvider';
 
 function App() {
@@ -75,6 +76,7 @@ function App() {
                             <Route path="/advances-loans/loan-repayment" element={<LoanRepayment />} />
                             <Route path="/cashbook/payments" element={<CashbookPayments />} />
                             <Route path="/gst/invoices" element={<GstInvoices />} />
+                            <Route path="/gst/purchase-tracker" element={<PurchaseGstTracker />} />
                             <Route path="/templates" element={<TemplatesPage />} />
                         </Route>
                         <Route path="*" element={<Navigate to="/" replace />} />

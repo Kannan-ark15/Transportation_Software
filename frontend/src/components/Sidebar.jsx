@@ -168,7 +168,11 @@ const Sidebar = () => {
             id: 'gst',
             label: 'GST',
             icon: <ReceiptText className="w-5 h-5" />,
-            path: '/gst/invoices'
+            hasSubmenu: true,
+            submenu: [
+                { label: 'Sales GST (Output)', path: '/gst/invoices' },
+                { label: 'Purchase GST (Input)', path: '/gst/purchase-tracker' }
+            ]
         },
         {
             id: 'templates',

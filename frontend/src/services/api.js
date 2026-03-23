@@ -155,6 +155,14 @@ export const gstInvoiceAPI = {
     }
 };
 
+export const purchaseGstTrackerAPI = {
+    ...generateCRUD('/purchase-gst-tracker'),
+    getMeta: async () => {
+        const response = await api.get('/purchase-gst-tracker/meta');
+        return response.data;
+    }
+};
+
 export const authAPI = {
     register: async (data) => {
         const response = await api.post('/auth/register', data);
