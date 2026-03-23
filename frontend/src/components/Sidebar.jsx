@@ -171,7 +171,8 @@ const Sidebar = () => {
             hasSubmenu: true,
             submenu: [
                 { label: 'Sales GST (Output)', path: '/gst/invoices' },
-                { label: 'Purchase GST (Input)', path: '/gst/purchase-tracker' }
+                { label: 'Purchase GST (Input)', path: '/gst/purchase-tracker' },
+                { label: 'ITC Ledger (Import)', path: '/gst/itc-ledger' }
             ]
         },
         {
