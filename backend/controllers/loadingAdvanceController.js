@@ -65,6 +65,114 @@ const dealerExistsForPlace = async (dealer_name, place_id) => {
     return result.rows.length > 0;
 };
 
+const findPlaceRateCard = async (client, placeId, vehicle_type, vehicle_sub_type, vehicle_body_type) => {
+    const result = await client.query(
+        `
+            SELECT rc.*
+            FROM place_rate_cards prc
+            JOIN rate_cards rc ON rc.id = prc.rate_card_id
+            WHERE prc.place_id = $1
+              AND rc.vehicle_type IS NOT DISTINCT FROM $2
+              AND rc.vehicle_sub_type IS NOT DISTINCT FROM $3
+              AND rc.vehicle_body_type IS NOT DISTINCT FROM $4
+            ORDER BY prc.id
+            LIMIT 1
+        `,
+        [placeId, vehicle_type, vehicle_sub_type, vehicle_body_type]
+    );
+    return result.rows[0] || null;
+};
+
+const upsertPlaceRateCardFromTransaction = async (client, rateCardData) => {
+    const {
+        place_id,
+        vehicle_type,
+        vehicle_sub_type,
+        vehicle_body_type,
+        kt_freight,
+        driver_bata,
+        advance,
+        unloading,
+        tarpaulin,
+        city_tax,
+        maintenance
+    } = rateCardData;
+
+    if (!place_id) return;
+
+    const parsedKtFreight = Number(kt_freight) || 0;
+    const parsedDriverBata = Number(driver_bata) || 0;
+    const parsedAdvance = Number(advance) || 0;
+    const parsedUnloading = Number(unloading) || 0;
+    const parsedCityTax = Number(city_tax) || 0;
+    const parsedMaintenance = Number(maintenance) || 0;
+    const isOpenContainer = String(vehicle_body_type || '').trim().toLowerCase() === 'open container';
+    const parsedTarpaulin = isOpenContainer ? (Number(tarpaulin) || 0) : null;
+
+    const existingRateCard = await findPlaceRateCard(
+        client,
+        place_id,
+        vehicle_type,
+        vehicle_sub_type,
+        vehicle_body_type
+    );
+
+    if (existingRateCard) {
+        await client.query(
+            `
+                UPDATE rate_cards
+                SET kt_freight = $2,
+                    driver_bata = $3,
+                    advance = $4,
+                    unloading = $5,
+                    tarpaulin = $6,
+                    city_tax = $7,
+                    maintenance = $8,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = $1
+            `,
+            [
+                existingRateCard.id,
+                parsedKtFreight,
+                parsedDriverBata,
+                parsedAdvance,
+                parsedUnloading,
+                parsedTarpaulin,
+                parsedCityTax,
+                parsedMaintenance
+            ]
+        );
+        return;
+    }
+
+    const createdRateCard = await client.query(
+        `
+            INSERT INTO rate_cards
+            (vehicle_type, vehicle_sub_type, vehicle_body_type, rcl_freight, kt_freight, driver_bata, advance, unloading, tarpaulin, city_tax, maintenance)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            RETURNING id
+        `,
+        [
+            vehicle_type || null,
+            vehicle_sub_type || null,
+            vehicle_body_type || null,
+            parsedKtFreight + 1,
+            parsedKtFreight,
+            parsedDriverBata,
+            parsedAdvance,
+            parsedUnloading,
+            parsedTarpaulin,
+            parsedCityTax,
+            parsedMaintenance
+        ]
+    );
+
+    await client.query(
+        'INSERT INTO place_rate_cards (place_id, rate_card_id) VALUES ($1, $2)',
+        [place_id, createdRateCard.rows[0].id]
+    );
+};
+
 const getNextVoucher = async (req, res, next) => {
     try {
         const { login_prefix } = req.query;
@@ -197,7 +305,15 @@ const createLoadingAdvance = async (req, res, next) => {
             const parsedQty = Number(quantity);
             const parsedKt = Number(kt_freight);
             const ifa_amount = Number.isFinite(parsedQty) && Number.isFinite(parsedKt) ? parsedQty * parsedKt : 0;
-            invoiceRows.push({ invoice_number, to_place, dealer_name, kt_freight: parsedKt || 0, quantity: parsedQty || 0, ifa_amount });
+            invoiceRows.push({
+                place_id: place.id,
+                invoice_number,
+                to_place,
+                dealer_name,
+                kt_freight: parsedKt || 0,
+                quantity: parsedQty || 0,
+                ifa_amount
+            });
         }
 
         const parsedDriverLoadingAdvance = Number(driver_loading_advance) || 0;
@@ -270,6 +386,28 @@ const createLoadingAdvance = async (req, res, next) => {
                 inv.quantity,
                 inv.ifa_amount
             ]);
+        }
+
+        const placeRateCardUpdates = new Map();
+        for (const inv of invoiceRows) {
+            if (!inv.place_id) continue;
+            placeRateCardUpdates.set(inv.place_id, {
+                place_id: inv.place_id,
+                vehicle_type,
+                vehicle_sub_type,
+                vehicle_body_type,
+                kt_freight: inv.kt_freight,
+                driver_bata: parsedDriverBata,
+                advance: parsedDriverLoadingAdvance,
+                unloading: parsedUnloadingRate,
+                tarpaulin: parsedTarpaulin,
+                city_tax: parsedCityTax,
+                maintenance: parsedMaintenance
+            });
+        }
+
+        for (const rateCardUpdate of placeRateCardUpdates.values()) {
+            await upsertPlaceRateCardFromTransaction(client, rateCardUpdate);
         }
 
         await client.query('COMMIT');
