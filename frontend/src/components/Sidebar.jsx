@@ -172,7 +172,8 @@ const Sidebar = () => {
             submenu: [
                 { label: 'Sales GST (Output)', path: '/gst/invoices' },
                 { label: 'Purchase GST (Input)', path: '/gst/purchase-tracker' },
-                { label: 'ITC Ledger (Import)', path: '/gst/itc-ledger' }
+                { label: 'ITC Ledger (Import)', path: '/gst/itc-ledger' },
+                { label: 'GST Filing', path: '/gst/filing' }
             ]
         },
         {
@@ -234,44 +235,44 @@ const Sidebar = () => {
                                             className="group/collapsible w-full"
                                         >
                                             <CollapsibleTrigger asChild>
-                                            <SidebarMenuButton
-                                                tooltip={item.label}
-                                                className={cn(
-                                                    "w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-200 text-sm font-medium",
-                                                    isSubmenuActive(item.submenu)
-                                                        ? "text-white bg-white/10 shadow-soft-inset"
-                                                        : "text-white/70 hover:bg-white/10 hover:text-white"
-                                                )}
-                                            >
-                                                {item.icon}
-                                                <span>{item.label}</span>
-                                                <ChevronRight className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                                            </SidebarMenuButton>
-                                        </CollapsibleTrigger>
-                                        <CollapsibleContent>
-                                            <SidebarMenuSub className="border-l border-white/10 ml-6 mt-1">
-                                                {item.submenu.map((subItem) => (
-                                                    <SidebarMenuSubItem key={subItem.path}>
-                                                        <SidebarMenuSubButton
-                                                            asChild
-                                                            isActive={isActive(subItem.path)}
-                                                        >
-                                                            <a
-                                                                href={subItem.path}
-                                                                onClick={(e) => {
-                                                                    e.preventDefault();
-                                                                    navigateAndCloseSidebar(subItem.path);
-                                                                }}
-                                                                className={cn(
-                                                                    "w-full text-sm py-2 px-3 rounded-lg transition-colors",
-                                                                    isActive(subItem.path)
-                                                                        ? "text-accent font-semibold bg-accent/15"
-                                                                        : "text-white/60 hover:text-white hover:bg-white/10"
-                                                                )}
+                                                <SidebarMenuButton
+                                                    tooltip={item.label}
+                                                    className={cn(
+                                                        "w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-200 text-sm font-medium",
+                                                        isSubmenuActive(item.submenu)
+                                                            ? "text-white bg-white/10 shadow-soft-inset"
+                                                            : "text-white/70 hover:bg-white/10 hover:text-white"
+                                                    )}
+                                                >
+                                                    {item.icon}
+                                                    <span>{item.label}</span>
+                                                    <ChevronRight className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                                                </SidebarMenuButton>
+                                            </CollapsibleTrigger>
+                                            <CollapsibleContent>
+                                                <SidebarMenuSub className="border-l border-white/10 ml-6 mt-1">
+                                                    {item.submenu.map((subItem) => (
+                                                        <SidebarMenuSubItem key={subItem.path}>
+                                                            <SidebarMenuSubButton
+                                                                asChild
+                                                                isActive={isActive(subItem.path)}
                                                             >
-                                                                {subItem.label}
-                                                            </a>
-                                                        </SidebarMenuSubButton>
+                                                                <a
+                                                                    href={subItem.path}
+                                                                    onClick={(e) => {
+                                                                        e.preventDefault();
+                                                                        navigateAndCloseSidebar(subItem.path);
+                                                                    }}
+                                                                    className={cn(
+                                                                        "w-full text-sm py-2 px-3 rounded-lg transition-colors",
+                                                                        isActive(subItem.path)
+                                                                            ? "text-accent font-semibold bg-accent/15"
+                                                                            : "text-white/60 hover:text-white hover:bg-white/10"
+                                                                    )}
+                                                                >
+                                                                    {subItem.label}
+                                                                </a>
+                                                            </SidebarMenuSubButton>
                                                         </SidebarMenuSubItem>
                                                     ))}
                                                 </SidebarMenuSub>
