@@ -70,6 +70,17 @@ const DealerList = () => {
 
     useEffect(() => { loadData(); }, []);
 
+    // Deduplicate places by to_place name (keep first occurrence)
+    const uniquePlaces = React.useMemo(() => {
+        const seen = new Map();
+        for (const p of places) {
+            if (!seen.has(p.to_place)) {
+                seen.set(p.to_place, p);
+            }
+        }
+        return Array.from(seen.values());
+    }, [places]);
+
     const loadData = async () => {
         try {
             setLoading(true);
@@ -388,7 +399,7 @@ const DealerList = () => {
                                         <SelectValue placeholder="Select location" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {places.map(p => (
+                                        {uniquePlaces.map(p => (
                                             <SelectItem key={p.id} value={p.id.toString()}>
                                                 {p.to_place}
                                             </SelectItem>

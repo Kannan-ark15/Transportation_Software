@@ -7,9 +7,9 @@ class PlaceController {
             const rateCards = Array.isArray(placeData.rate_cards) ? placeData.rate_cards : [];
             delete placeData.rate_cards;
 
-            const exists = await PlaceModel.existsCombination(placeData.to_place, placeData.product_id);
+            const exists = await PlaceModel.existsCombination(placeData.from_place, placeData.to_place, placeData.product_id);
             if (exists) {
-                return res.status(400).json({ success: false, message: 'This Place and Product combination already exists' });
+                return res.status(400).json({ success: false, message: 'This From Place, To Place and Product combination already exists' });
             }
             const newPlace = await PlaceModel.createWithRateCards(placeData, rateCards);
             res.status(201).json({ success: true, message: 'Place created successfully', data: newPlace });
@@ -48,9 +48,9 @@ class PlaceController {
             const rateCards = Array.isArray(placeData.rate_cards) ? placeData.rate_cards : null;
             delete placeData.rate_cards;
 
-            const exists = await PlaceModel.existsCombination(placeData.to_place, placeData.product_id, id);
+            const exists = await PlaceModel.existsCombination(placeData.from_place, placeData.to_place, placeData.product_id, id);
             if (exists) {
-                return res.status(400).json({ success: false, message: 'This Place and Product combination already exists' });
+                return res.status(400).json({ success: false, message: 'This From Place, To Place and Product combination already exists' });
             }
             const updatedPlace = Array.isArray(rateCards)
                 ? await PlaceModel.updateWithRateCards(id, placeData, rateCards)

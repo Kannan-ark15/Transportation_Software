@@ -237,11 +237,11 @@ class PlaceModel {
         return result.rows[0];
     }
 
-    static async existsCombination(to_place, product_id, excludeId = null) {
-        let query = 'SELECT id FROM places WHERE to_place = $1 AND product_id = $2';
-        const values = [to_place, product_id];
+    static async existsCombination(from_place, to_place, product_id, excludeId = null) {
+        let query = 'SELECT id FROM places WHERE from_place = $1 AND to_place = $2 AND product_id = $3';
+        const values = [from_place, to_place, product_id];
         if (excludeId) {
-            query += ' AND id != $3';
+            query += ' AND id != $4';
             values.push(excludeId);
         }
         const result = await pool.query(query, values);
