@@ -28,6 +28,7 @@ import CompliancePaymentReminder from './components/CompliancePaymentReminder';
 import GstInvoices from './components/GstInvoices';
 import PurchaseGstTracker from './components/PurchaseGstTracker';
 import ItcLedger from './components/ItcLedger';
+import GstFiling from './components/GstFiling';
 import GlobalDialogProvider from './components/common/GlobalDialogProvider';
 
 function App() {
@@ -79,6 +80,7 @@ function App() {
                             <Route path="/gst/invoices" element={<GstInvoices />} />
                             <Route path="/gst/purchase-tracker" element={<PurchaseGstTracker />} />
                             <Route path="/gst/itc-ledger" element={<ItcLedger />} />
+                            <Route path="/gst/filing" element={<GstFiling />} />
                             <Route path="/templates" element={<TemplatesPage />} />
                         </Route>
                         <Route path="*" element={<Navigate to="/" replace />} />

@@ -171,6 +171,13 @@ export const itcLedgerAPI = {
     }
 };
 
+export const gstFilingAPI = {
+    getSummary: async () => {
+        const response = await api.get('/gst-filing');
+        return response.data;
+    }
+};
+
 export const authAPI = {
     register: async (data) => {
         const response = await api.post('/auth/register', data);
