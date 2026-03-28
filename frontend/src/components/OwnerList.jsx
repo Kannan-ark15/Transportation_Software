@@ -54,6 +54,8 @@ import { Switch } from "@/components/ui/switch"
 import { cn } from '@/lib/utils';
 import { showAlert, showConfirm } from '@/lib/dialogService';
 
+const isMarketOwnerType = (value) => String(value || '').trim().toLowerCase() === 'market';
+
 const OwnerList = () => {
     const [owners, setOwners] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -78,6 +80,7 @@ const OwnerList = () => {
     });
 
     const [formErrors, setFormErrors] = useState({});
+    const isMarketOwner = isMarketOwnerType(formData.owner_type);
 
     useEffect(() => { loadOwners(); }, []);
 
@@ -97,24 +100,25 @@ const OwnerList = () => {
             let errors = [];
 
             for (const row of importedData) {
+                const ownerType = row['Owner Type'] || row['owner_type'] || 'Own';
                 const mappedData = {
-                    owner_type: row['Owner Type'] || row['owner_type'] || 'Own',
-                    owner_name: row['Owner Name'] || row['owner_name'],
-                    pan_no: row['PAN'] || row['pan_no'],
-                    aadhar_no: row['Aadhar'] || row['aadhar_no'],
+                    owner_type: ownerType,
+                    owner_name: row['Owner Name'] || row['owner_name'] || '',
+                    pan_no: row['PAN'] || row['pan_no'] || '',
+                    aadhar_no: row['Aadhar'] || row['aadhar_no'] || '',
                     gst_no: row['GST'] || row['gst_no'] || '',
-                    company_address: row['Address'] || row['company_address'],
-                    place: row['Place'] || row['place'],
-                    contact_no: row['Contact No'] || row['contact_no'],
+                    company_address: row['Address'] || row['company_address'] || '',
+                    place: row['Place'] || row['place'] || '',
+                    contact_no: row['Contact No'] || row['contact_no'] || '',
                     email_id: row['Email'] || row['email_id'] || '',
-                    bank_name: row['Bank Name'] || row['bank_name'],
-                    branch: row['Branch'] || row['branch'],
-                    account_no: row['Account No'] || row['account_no'],
-                    ifsc_code: row['IFSC'] || row['ifsc_code'],
+                    bank_name: row['Bank Name'] || row['bank_name'] || '',
+                    branch: row['Branch'] || row['branch'] || '',
+                    account_no: row['Account No'] || row['account_no'] || '',
+                    ifsc_code: row['IFSC'] || row['ifsc_code'] || '',
                     status: 'Active'
                 };
 
-                if (!mappedData.owner_name || !mappedData.pan_no) continue;
+                if (!mappedData.owner_name) continue;
 
                 try {
                     await ownerAPI.create(mappedData);
@@ -166,11 +170,11 @@ const OwnerList = () => {
 
     const validate = () => {
         const errors = {};
-        const mandatoryFields = [
-            'owner_type', 'owner_name', 'pan_no', 'aadhar_no',
-            'company_address', 'place', 'contact_no',
-            'bank_name', 'branch', 'account_no', 'ifsc_code'
-        ];
+        const mandatoryFields = ['owner_type', 'owner_name', 'bank_name', 'branch', 'account_no', 'ifsc_code'];
+
+        if (!isMarketOwnerType(formData.owner_type)) {
+            mandatoryFields.push('pan_no', 'aadhar_no', 'company_address', 'place', 'contact_no');
+        }
 
         mandatoryFields.forEach(field => {
             if (!formData[field] || String(formData[field]).trim() === '') {
@@ -469,10 +473,17 @@ const OwnerList = () => {
                                         {formErrors.owner_name && <p className="text-[10px] text-red-500">{formErrors.owner_name}</p>}
                                     </div>
                                 </div>
+                                {isMarketOwner && (
+                                    <p className="text-xs text-slate-500">
+                                        PAN, Aadhar, address, place, contact number, and email address can be left blank for Market owners.
+                                    </p>
+                                )}
 
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="pan_no" className="required">PAN Number</Label>
+                                        <Label htmlFor="pan_no" className={cn(!isMarketOwner && "required")}>
+                                            PAN Number{isMarketOwner ? ' (Optional)' : ''}
+                                        </Label>
                                         <Input
                                             id="pan_no"
                                             value={formData.pan_no}
@@ -484,7 +495,9 @@ const OwnerList = () => {
                                         {formErrors.pan_no && <p className="text-[10px] text-red-500">{formErrors.pan_no}</p>}
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="aadhar_no" className="required">Aadhar Number</Label>
+                                        <Label htmlFor="aadhar_no" className={cn(!isMarketOwner && "required")}>
+                                            Aadhar Number{isMarketOwner ? ' (Optional)' : ''}
+                                        </Label>
                                         <Input
                                             id="aadhar_no"
                                             value={formData.aadhar_no}
@@ -518,7 +531,9 @@ const OwnerList = () => {
                                 </h4>
                                 <div className="space-y-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="company_address" className="required">Company Address</Label>
+                                        <Label htmlFor="company_address" className={cn(!isMarketOwner && "required")}>
+                                            Company Address{isMarketOwner ? ' (Optional)' : ''}
+                                        </Label>
                                         <Textarea
                                             id="company_address"
                                             value={formData.company_address}
@@ -529,17 +544,21 @@ const OwnerList = () => {
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                         <div className="space-y-2">
-                                            <Label htmlFor="place" className="required">Place / City</Label>
+                                            <Label htmlFor="place" className={cn(!isMarketOwner && "required")}>
+                                                Place / City{isMarketOwner ? ' (Optional)' : ''}
+                                            </Label>
                                             <Input id="place" value={formData.place} onChange={e => setFormData({ ...formData, place: e.target.value })} />
                                             {formErrors.place && <p className="text-[10px] text-red-500">{formErrors.place}</p>}
                                         </div>
                                         <div className="space-y-2">
-                                            <Label htmlFor="contact_no" className="required">Contact Number</Label>
+                                            <Label htmlFor="contact_no" className={cn(!isMarketOwner && "required")}>
+                                                Contact Number{isMarketOwner ? ' (Optional)' : ''}
+                                            </Label>
                                             <Input id="contact_no" value={formData.contact_no} onChange={e => setFormData({ ...formData, contact_no: e.target.value })} maxLength={10} />
                                             {formErrors.contact_no && <p className="text-[10px] text-red-500">{formErrors.contact_no}</p>}
                                         </div>
                                         <div className="space-y-2">
-                                            <Label htmlFor="email_id">Email Address</Label>
+                                            <Label htmlFor="email_id">Email Address{isMarketOwner ? ' (Optional)' : ''}</Label>
                                             <Input id="email_id" type="email" value={formData.email_id} onChange={e => setFormData({ ...formData, email_id: e.target.value })} />
                                         </div>
                                     </div>
