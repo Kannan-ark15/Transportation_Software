@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { vehicleAPI, productAPI, placeAPI, dealerAPI, pumpAPI, driverAPI, loadingAdvanceAPI } from '../services/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -21,6 +21,24 @@ const getLastEditedDriverName = (drivers = []) => {
     });
     return sorted[0]?.driver_name || '';
 };
+
+const normalizePlaceKey = (value) => String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+const getFromPlaceAliasesForPrefix = (prefix) => {
+    const normalizedPrefix = normalizePlaceKey(prefix);
+    if (!normalizedPrefix) return [];
+    if (normalizedPrefix === 'HOF' || normalizedPrefix === 'HEADOFFICE') return [];
+    const map = {
+        ARY: ['ARIYALUR', 'ARY'],
+        ARIYALUR: ['ARIYALUR', 'ARY'],
+        PND: ['ALATHIYUR', 'ALATHIUR', 'PND'],
+        ALATHIYUR: ['ALATHIYUR', 'ALATHIUR', 'PND'],
+        ALATHIUR: ['ALATHIYUR', 'ALATHIUR', 'PND']
+    };
+    const aliases = map[normalizedPrefix] || [normalizedPrefix];
+    return Array.from(new Set(aliases.map(normalizePlaceKey).filter(Boolean)));
+};
+
 const LoadingAdvance = () => {
     const [vehicles, setVehicles] = useState([]), [products, setProducts] = useState([]), [places, setPlaces] = useState([]), [dealers, setDealers] = useState([]), [pumps, setPumps] = useState([]), [drivers, setDrivers] = useState([]), [form, setForm] = useState(emptyForm), [loading, setLoading] = useState(true), [submitting, setSubmitting] = useState(false), [error, setError] = useState(''), [success, setSuccess] = useState(''), [lastSaved, setLastSaved] = useState(null), [voucherDisplay, setVoucherDisplay] = useState('Loading...'), [now] = useState(() => new Date().toLocaleString()), [modalOpen, setModalOpen] = useState(false), [refreshKey, setRefreshKey] = useState(0);
     const loginPrefix = (() => { try { return JSON.parse(localStorage.getItem('auth_user') || '{}')?.login_prefix; } catch { return undefined; } })();
@@ -43,8 +61,35 @@ const LoadingAdvance = () => {
     const tdsAmount = Number(form.tds) || 0;
     const tripBalance = (sumIfas - (commissionAmt + (Number(form.driver_loading_advance) || 0) + fuelAmountVal + tdsAmount)).toFixed(2);
     const defaultDriverName = getLastEditedDriverName(drivers);
-    const placeOptions = (product) => product ? places.filter(p => p.product_name === product) : places;
-    const dealerOptions = (placeId) => placeId ? dealers.filter(d => String(d.place_id) === String(placeId)) : [];
+    const fromPlaceAliases = useMemo(() => getFromPlaceAliasesForPrefix(loginPrefix), [loginPrefix]);
+    const placesById = useMemo(() => {
+        const byId = new Map();
+        for (const place of places) byId.set(String(place.id), place);
+        return byId;
+    }, [places]);
+    const placeOptions = (product) => {
+        const productPlaces = product ? places.filter(p => p.product_name === product) : places;
+        if (!fromPlaceAliases.length) return productPlaces;
+        return productPlaces.filter((p) => fromPlaceAliases.includes(normalizePlaceKey(p.from_place)));
+    };
+    const dealerOptions = (placeId) => {
+        if (!placeId) return [];
+        const selectedPlace = placesById.get(String(placeId));
+        if (!selectedPlace) return [];
+        const toPlaceKey = normalizePlaceKey(selectedPlace.to_place);
+        const seenDealer = new Set();
+        const options = [];
+        for (const dealer of dealers) {
+            const dealerPlace = placesById.get(String(dealer.place_id));
+            if (!dealerPlace) continue;
+            if (normalizePlaceKey(dealerPlace.to_place) !== toPlaceKey) continue;
+            const dealerKey = String(dealer.dealer_name || '').trim().toLowerCase();
+            if (!dealerKey || seenDealer.has(dealerKey)) continue;
+            seenDealer.add(dealerKey);
+            options.push(dealer);
+        }
+        return options;
+    };
     const fetchNextVoucher = async () => { if (!loginPrefix) return setVoucherDisplay('Auto generated'); try { const res = await loadingAdvanceAPI.getNextVoucher(loginPrefix); setVoucherDisplay(res.success ? res.data.voucher_number : 'Auto generated'); } catch { setVoucherDisplay('Auto generated'); } };
     useEffect(() => {
         const load = async () => {

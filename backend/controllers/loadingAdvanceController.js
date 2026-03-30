@@ -23,6 +23,19 @@ const normalizePrefix = (val) => {
     return map[raw] || raw.replace(/[^A-Z0-9]/g, '').slice(0, 3) || 'HOF';
 };
 
+const normalizePlaceKey = (val) => String(val || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+const getFromPlaceAliasesForPrefix = (loginPrefix) => {
+    const normalizedPrefix = normalizePrefix(loginPrefix);
+    if (normalizedPrefix === 'HOF') return [];
+    const map = {
+        ARY: ['ARIYALUR', 'ARY'],
+        PND: ['ALATHIYUR', 'ALATHIUR', 'PND']
+    };
+    const aliases = map[normalizedPrefix] || [normalizedPrefix];
+    return Array.from(new Set(aliases.map(normalizePlaceKey).filter(Boolean)));
+};
+
 const buildVoucherNumber = async (loginPrefix = 'HOF', date = new Date()) => {
     const prefix = normalizePrefix(loginPrefix);
     const fy = getFinancialYear(date);
@@ -45,22 +58,54 @@ const existsProduct = async (productName) => {
     return result.rows.length > 0;
 };
 
-const findPlaceByNameAndProduct = async (to_place, product_name) => {
-    const result = await pool.query(
-        `SELECT p.id
-         FROM places p
-         JOIN products pr ON p.product_id = pr.id
-         WHERE p.to_place = $1 AND pr.product_name = $2
-         LIMIT 1`,
-        [to_place, product_name]
-    );
-    return result.rows[0];
+const buildFromPlaceClause = (fromPlaceAliases = [], startIndex = 1) => {
+    if (!Array.isArray(fromPlaceAliases) || fromPlaceAliases.length === 0) {
+        return { clause: '', values: [] };
+    }
+    return {
+        clause: ` AND UPPER(REGEXP_REPLACE(COALESCE(p.from_place, ''), '[^A-Z0-9]', '', 'g')) = ANY($${startIndex})`,
+        values: [fromPlaceAliases]
+    };
 };
 
-const dealerExistsForPlace = async (dealer_name, place_id) => {
+const findPlaceByIdAndProduct = async (place_id, product_name, fromPlaceAliases = []) => {
+    const fromPlaceFilter = buildFromPlaceClause(fromPlaceAliases, 3);
     const result = await pool.query(
-        'SELECT 1 FROM dealers WHERE dealer_name = $1 AND place_id = $2',
-        [dealer_name, place_id]
+        `SELECT p.id, p.to_place
+         FROM places p
+         JOIN products pr ON p.product_id = pr.id
+         WHERE p.id = $1
+           AND pr.product_name = $2${fromPlaceFilter.clause}
+         LIMIT 1`,
+        [place_id, product_name, ...fromPlaceFilter.values]
+    );
+    return result.rows[0] || null;
+};
+
+const findPlaceByNameAndProduct = async (to_place, product_name, fromPlaceAliases = []) => {
+    const fromPlaceFilter = buildFromPlaceClause(fromPlaceAliases, 3);
+    const result = await pool.query(
+        `SELECT p.id, p.to_place
+         FROM places p
+         JOIN products pr ON p.product_id = pr.id
+         WHERE LOWER(TRIM(p.to_place)) = LOWER(TRIM($1))
+           AND pr.product_name = $2${fromPlaceFilter.clause}
+         ORDER BY p.id
+         LIMIT 1`,
+        [to_place, product_name, ...fromPlaceFilter.values]
+    );
+    return result.rows[0] || null;
+};
+
+const dealerExistsForToPlace = async (dealer_name, to_place) => {
+    const result = await pool.query(
+        `SELECT 1
+         FROM dealers d
+         JOIN places p ON p.id = d.place_id
+         WHERE LOWER(TRIM(d.dealer_name)) = LOWER(TRIM($1))
+           AND UPPER(REGEXP_REPLACE(COALESCE(p.to_place, ''), '[^A-Z0-9]', '', 'g')) = UPPER(REGEXP_REPLACE(COALESCE($2, ''), '[^A-Z0-9]', '', 'g'))
+         LIMIT 1`,
+        [dealer_name, to_place]
     );
     return result.rows.length > 0;
 };
@@ -267,6 +312,7 @@ const createLoadingAdvance = async (req, res, next) => {
 
         if (!(await existsVehicle(vehicle_registration_number))) return res.status(400).json({ success: false, message: 'Invalid vehicle registration number' });
         if (!(await existsProduct(product_name))) return res.status(400).json({ success: false, message: 'Invalid product name' });
+        const fromPlaceAliases = getFromPlaceAliasesForPrefix(login_prefix);
 
         const ownerTypeLower = String(owner_type || '').toLowerCase();
         const isCommissioned = ownerTypeLower === 'dedicated' || ownerTypeLower === 'market';
@@ -291,6 +337,7 @@ const createLoadingAdvance = async (req, res, next) => {
         for (const inv of invoices) {
             const invoice_number = inv.invoice_number;
             const to_place = inv.to_place;
+            const place_id = inv.place_id;
             const dealer_name = inv.dealer_name;
             const quantity = inv.quantity;
             const kt_freight = inv.kt_freight;
@@ -299,16 +346,21 @@ const createLoadingAdvance = async (req, res, next) => {
             }
             if (seen.has(invoice_number)) return res.status(400).json({ success: false, message: 'Duplicate invoice number' });
             seen.add(invoice_number);
-            const place = await findPlaceByNameAndProduct(to_place, product_name);
-            if (!place) return res.status(400).json({ success: false, message: 'Invalid place for selected product' });
-            if (!(await dealerExistsForPlace(dealer_name, place.id))) return res.status(400).json({ success: false, message: 'Invalid dealer for selected place' });
+            const place = place_id
+                ? await findPlaceByIdAndProduct(place_id, product_name, fromPlaceAliases)
+                : await findPlaceByNameAndProduct(to_place, product_name, fromPlaceAliases);
+            if (!place) return res.status(400).json({ success: false, message: 'Invalid place for selected product and login branch' });
+            const resolvedToPlace = place.to_place || to_place;
+            if (!(await dealerExistsForToPlace(dealer_name, resolvedToPlace))) {
+                return res.status(400).json({ success: false, message: 'Invalid dealer for selected To Place' });
+            }
             const parsedQty = Number(quantity);
             const parsedKt = Number(kt_freight);
             const ifa_amount = Number.isFinite(parsedQty) && Number.isFinite(parsedKt) ? parsedQty * parsedKt : 0;
             invoiceRows.push({
                 place_id: place.id,
                 invoice_number,
-                to_place,
+                to_place: resolvedToPlace,
                 dealer_name,
                 kt_freight: parsedKt || 0,
                 quantity: parsedQty || 0,
