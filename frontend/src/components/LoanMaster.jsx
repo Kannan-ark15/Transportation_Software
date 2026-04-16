@@ -391,7 +391,7 @@ const LoanMaster = () => {
             setSchedules(parsed.scheduleRows);
         } catch (err) {
             console.error('PDF parse error:', err);
-            setPdfError('Failed to parse PDF. Please check the file format.');
+            setPdfError(err?.response?.data?.message || err?.message || 'Failed to parse PDF. Please check the file format.');
         } finally {
             setPdfParsing(false);
             if (pdfInputRef.current) pdfInputRef.current.value = '';
