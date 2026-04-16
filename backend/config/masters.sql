@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS places (
     product_id INTEGER REFERENCES products(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(to_place, product_id) -- Unique Place + Product Combination as per rules
+    UNIQUE(company_id, to_place, product_id) -- Unique Company + Place + Product Combination
 );
 
 -- 4A. RATE CARDS MASTER (defines vehicle type rates for place routes)
@@ -94,6 +94,42 @@ CREATE TABLE IF NOT EXISTS place_rate_cards (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(place_id, rate_card_id)
 );
+
+-- Migrate: allow same to_place+product under different companies
+DO $$
+DECLARE
+    row_rec RECORD;
+BEGIN
+    FOR row_rec IN
+        SELECT c.conname AS constraint_name
+        FROM pg_constraint c
+        JOIN pg_class t ON t.oid = c.conrelid
+        JOIN pg_namespace n ON n.oid = t.relnamespace
+        WHERE c.contype = 'u'
+          AND n.nspname = 'public'
+          AND t.relname = 'places'
+          AND array_length(c.conkey, 1) = 2
+    LOOP
+        EXECUTE format('ALTER TABLE places DROP CONSTRAINT IF EXISTS %I', row_rec.constraint_name);
+    END LOOP;
+END;
+$$;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint c
+        JOIN pg_class t ON t.oid = c.conrelid
+        JOIN pg_namespace n ON n.oid = t.relnamespace
+        WHERE c.contype = 'u'
+          AND n.nspname = 'public'
+          AND t.relname = 'places'
+          AND array_length(c.conkey, 1) = 3
+    ) THEN
+        ALTER TABLE places ADD CONSTRAINT places_company_toplace_product_unique UNIQUE (company_id, to_place, product_id);
+    END IF;
+END;
+$$;
 
 -- 4B. LOGIN USERS
 CREATE TABLE IF NOT EXISTS login_users (

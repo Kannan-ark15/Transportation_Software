@@ -290,6 +290,10 @@ const createLoadingAdvance = async (req, res, next) => {
             tds = 0
         } = req.body;
 
+        const ownerTypeLower = String(owner_type || '').toLowerCase();
+        const isDedicated = ownerTypeLower === 'dedicated';
+        const isCommissioned = isDedicated || ownerTypeLower === 'market';
+
         const required = {
             vehicle_registration_number,
             vehicle_type,
@@ -300,13 +304,16 @@ const createLoadingAdvance = async (req, res, next) => {
             product_name,
             invoice_date,
             driver_bata,
-            unloading,
-            pump_name,
-            fuel_litre,
-            fuel_rate,
-            driver_loading_advance
+            unloading
         };
-        const missing = Object.entries(required).filter(([, v]) => !v).map(([k]) => k);
+        if (!isDedicated) {
+            required.pump_name = pump_name;
+            required.fuel_litre = fuel_litre;
+            required.fuel_rate = fuel_rate;
+            required.driver_loading_advance = driver_loading_advance;
+        }
+        const isFieldEmpty = (v) => v === '' || v === null || v === undefined;
+        const missing = Object.entries(required).filter(([, v]) => isFieldEmpty(v)).map(([k]) => k);
         if (missing.length) return res.status(400).json({ success: false, message: `Missing: ${missing.join(', ')}` });
         if (!Array.isArray(invoices) || invoices.length === 0) return res.status(400).json({ success: false, message: 'At least one invoice is required' });
 
@@ -314,8 +321,6 @@ const createLoadingAdvance = async (req, res, next) => {
         if (!(await existsProduct(product_name))) return res.status(400).json({ success: false, message: 'Invalid product name' });
         const fromPlaceAliases = getFromPlaceAliasesForPrefix(login_prefix);
 
-        const ownerTypeLower = String(owner_type || '').toLowerCase();
-        const isCommissioned = ownerTypeLower === 'dedicated' || ownerTypeLower === 'market';
         if (!isCommissioned && !driver_name) return res.status(400).json({ success: false, message: 'Driver name is required' });
         const commission_pct = isCommissioned ? 6 : 0;
         const parsedDriverBata = Number(driver_bata) || 0;
@@ -325,12 +330,17 @@ const createLoadingAdvance = async (req, res, next) => {
         const parsedMaintenance = Number(maintenance) || 0;
 
 
-        const pumpRes = await client.query('SELECT rate FROM pumps WHERE pump_name = $1', [pump_name]);
-        if (pumpRes.rows.length === 0) return res.status(400).json({ success: false, message: 'Invalid pump selection' });
-        const pumpRate = Number(pumpRes.rows[0].rate);
-        const parsedFuelRate = Number(fuel_rate) || pumpRate || 0;
-        const parsedFuelLitre = Number(fuel_litre) || 0;
-        const fuel_amount = parsedFuelLitre * parsedFuelRate;
+        let parsedFuelRate = 0, parsedFuelLitre = 0, fuel_amount = 0;
+        if (pump_name) {
+            const pumpRes = await client.query('SELECT rate FROM pumps WHERE pump_name = $1', [pump_name]);
+            if (pumpRes.rows.length === 0 && !isDedicated) return res.status(400).json({ success: false, message: 'Invalid pump selection' });
+            const pumpRate = pumpRes.rows.length > 0 ? Number(pumpRes.rows[0].rate) : 0;
+            parsedFuelRate = Number(fuel_rate) || pumpRate || 0;
+            parsedFuelLitre = Number(fuel_litre) || 0;
+            fuel_amount = parsedFuelLitre * parsedFuelRate;
+        } else if (!isDedicated) {
+            return res.status(400).json({ success: false, message: 'Invalid pump selection' });
+        }
 
         const seen = new Set();
         const invoiceRows = [];
@@ -412,7 +422,7 @@ const createLoadingAdvance = async (req, res, next) => {
             parsedFuelLitre,
             parsedFuelRate,
             fuel_amount,
-            isCommissioned ? null : driver_name,
+            isDedicated ? (driver_name || null) : (isCommissioned ? null : driver_name),
             parsedDriverLoadingAdvance,
             trip_balance,
             commission_pct,

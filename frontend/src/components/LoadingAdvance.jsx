@@ -52,7 +52,7 @@ const LoadingAdvance = () => {
     const cityTax = Number(form.city_tax) || 0;
     const maintenance = Number(form.maintenance) || 0;
     const expenseSum = driverBata + unloadingCharges + tarpaulinVal + cityTax + maintenance;
-    const ownerType = String(form.owner_type || '').toLowerCase(), isCommissioned = ownerType === 'dedicated' || ownerType === 'market', commissionPct = isCommissioned ? 6 : 0;
+    const ownerType = String(form.owner_type || '').toLowerCase(), isDedicated = ownerType === 'dedicated', isCommissioned = isDedicated || ownerType === 'market', commissionPct = isCommissioned ? 6 : 0;
     const commissionAmt = (sumIfas * commissionPct) / 100;
     const grossAmountVal = isCommissioned ? (commissionAmt - expenseSum) : (sumIfas - expenseSum);
 
@@ -69,8 +69,14 @@ const LoadingAdvance = () => {
     }, [places]);
     const placeOptions = (product) => {
         const productPlaces = product ? places.filter(p => p.product_name === product) : places;
-        if (!fromPlaceAliases.length) return productPlaces;
-        return productPlaces.filter((p) => fromPlaceAliases.includes(normalizePlaceKey(p.from_place)));
+        const filtered = fromPlaceAliases.length ? productPlaces.filter((p) => fromPlaceAliases.includes(normalizePlaceKey(p.from_place))) : productPlaces;
+        const seen = new Set();
+        return filtered.filter(p => {
+            const key = normalizePlaceKey(p.to_place);
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
     };
     const dealerOptions = (placeId) => {
         if (!placeId) return [];
@@ -132,7 +138,8 @@ const LoadingAdvance = () => {
     const onPlaceChange = async (idx, placeId) => { const place = places.find(p => String(p.id) === String(placeId)); updateInvoice(idx, { place_id: placeId, to_place: place?.to_place || '', dealer_name: '' }); try { const res = await placeAPI.getById(placeId); const cards = res.success ? (res.data.rate_cards || []) : []; const vt = form.vehicle_type, vst = form.vehicle_sub_type, vbt = form.vehicle_body_type; const match = cards.find(rc => rc.vehicle_type === vt && rc.vehicle_sub_type === vst && rc.vehicle_body_type === vbt) || cards[0]; if (match) { updateInvoice(idx, { kt_freight: match.kt_freight ?? '' }); setForm(f => ({ ...f, driver_bata: match.driver_bata ?? f.driver_bata, unloading: match.unloading ?? f.unloading, tarpaulin: String(vbt || '').toLowerCase().includes('container') ? 0 : (match.tarpaulin ?? f.tarpaulin), city_tax: match.city_tax ?? f.city_tax, maintenance: match.maintenance ?? f.maintenance, driver_loading_advance: f.driver_loading_advance || match.advance || '' })); } } catch { } };
 
     const onPumpChange = (val) => { const p = pumps.find(x => x.pump_name === val); setForm(f => ({ ...f, pump_name: val, fuel_rate: p?.rate ?? f.fuel_rate })); };
-    const handleSubmit = async (e) => { e.preventDefault(); setError(''); setSuccess(''); if (!form.vehicle_registration_number || !form.product_name || !form.invoice_date || !form.driver_bata || !form.unloading || !form.pump_name || !form.fuel_litre || !form.fuel_rate || !form.driver_loading_advance) return setError('Please fill all mandatory fields'); if (!isCommissioned && !form.driver_name) return setError('Driver name is required'); if (form.invoices.some(i => !i.invoice_number || !i.to_place || !i.dealer_name || !i.quantity || !i.kt_freight)) return setError('Please fill all invoice fields'); try { setSubmitting(true); const invoices = form.invoices.map(i => ({ ...i, ifa_amount: (Number(i.quantity) || 0) * (Number(i.kt_freight) || 0) })); const res = await loadingAdvanceAPI.create({ ...form, invoices, commission_pct: commissionPct, login_prefix: loginPrefix }); if (res.success) { setSuccess(`Saved voucher ${res.data.voucher_number}`); setLastSaved(res.data); setForm({ ...emptyForm, driver_name: defaultDriverName }); fetchNextVoucher(); setRefreshKey(k => k + 1); } } catch (err) { setError(err.response?.data?.message || 'Save failed'); } finally { setSubmitting(false); } };
+    const isEmpty = (v) => v === '' || v === null || v === undefined;
+    const handleSubmit = async (e) => { e.preventDefault(); setError(''); setSuccess(''); const baseRequired = isEmpty(form.vehicle_registration_number) || isEmpty(form.product_name) || isEmpty(form.invoice_date) || isEmpty(form.driver_bata) || isEmpty(form.unloading); const fuelRequired = !isDedicated && (isEmpty(form.pump_name) || isEmpty(form.fuel_litre) || isEmpty(form.fuel_rate)); const advanceRequired = !isDedicated && isEmpty(form.driver_loading_advance); if (baseRequired || fuelRequired || advanceRequired) return setError('Please fill all mandatory fields'); if (!isCommissioned && isEmpty(form.driver_name)) return setError('Driver name is required'); if (form.invoices.some(i => isEmpty(i.invoice_number) || isEmpty(i.to_place) || isEmpty(i.dealer_name) || isEmpty(i.quantity) || isEmpty(i.kt_freight))) return setError('Please fill all invoice fields'); try { setSubmitting(true); const invoices = form.invoices.map(i => ({ ...i, ifa_amount: (Number(i.quantity) || 0) * (Number(i.kt_freight) || 0) })); const res = await loadingAdvanceAPI.create({ ...form, invoices, commission_pct: commissionPct, login_prefix: loginPrefix }); if (res.success) { setSuccess(`Saved voucher ${res.data.voucher_number}`); setLastSaved(res.data); setForm({ ...emptyForm, driver_name: defaultDriverName }); fetchNextVoucher(); setRefreshKey(k => k + 1); } } catch (err) { setError(err.response?.data?.message || 'Save failed'); } finally { setSubmitting(false); } };
     if (loading) return (<div className="flex flex-col items-center justify-center min-h-[300px] text-slate-500"><Loader2 className="h-10 w-10 animate-spin text-blue-600 mb-3" /><p className="text-base font-medium">Loading masters...</p></div>);
     return (
         <div className="space-y-6">
@@ -191,16 +198,20 @@ const LoadingAdvance = () => {
                         </Card>
                         <Card className="border border-slate-100 shadow-none"><CardHeader className="pb-2 bg-accent/10 border-b border-accent/20 rounded-t-lg"><CardTitle className="text-lg text-accent">Fuel & Pump Details</CardTitle></CardHeader>
                             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-1"><Label className="required">Pump Name</Label><Select value={form.pump_name} onValueChange={onPumpChange}><SelectTrigger><SelectValue placeholder="Select pump" /></SelectTrigger><SelectContent>{pumps.map(p => <SelectItem key={p.id} value={p.pump_name}>{p.pump_name}</SelectItem>)}</SelectContent></Select></div>
-                                <div className="space-y-1"><Label className="required">Fuel Litre</Label><Input type="number" step="0.01" value={form.fuel_litre} onChange={e => setForm(f => ({ ...f, fuel_litre: e.target.value }))} /></div>
-                                <div className="space-y-1"><Label className="required">Fuel Rate</Label><Input type="number" step="0.01" value={form.fuel_rate} onChange={e => setForm(f => ({ ...f, fuel_rate: e.target.value }))} /></div>
+                                <div className="space-y-1"><Label className={isDedicated ? '' : 'required'}>Pump Name</Label><Select value={form.pump_name} onValueChange={onPumpChange}><SelectTrigger><SelectValue placeholder="Select pump" /></SelectTrigger><SelectContent>{pumps.map(p => <SelectItem key={p.id} value={p.pump_name}>{p.pump_name}</SelectItem>)}</SelectContent></Select></div>
+                                <div className="space-y-1"><Label className={isDedicated ? '' : 'required'}>Fuel Litre</Label><Input type="number" step="0.01" value={form.fuel_litre} onChange={e => setForm(f => ({ ...f, fuel_litre: e.target.value }))} /></div>
+                                <div className="space-y-1"><Label className={isDedicated ? '' : 'required'}>Fuel Rate</Label><Input type="number" step="0.01" value={form.fuel_rate} onChange={e => setForm(f => ({ ...f, fuel_rate: e.target.value }))} /></div>
                                 <div className="space-y-1"><Label>Fuel Amount</Label><Input disabled value={fuelAmount} /></div>
                             </CardContent>
                         </Card>
                         <Card className="border border-slate-100 shadow-none"><CardHeader className="pb-2 bg-accent/10 border-b border-accent/20 rounded-t-lg"><CardTitle className="text-lg text-accent">Driver & Trip Financial Summary</CardTitle></CardHeader>
                             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-1"><Label className="required">Driver Name</Label><Select value={form.driver_name} onValueChange={v => setForm(f => ({ ...f, driver_name: v }))} disabled={isCommissioned}><SelectTrigger><SelectValue placeholder="Select driver" /></SelectTrigger><SelectContent>{drivers.map(d => <SelectItem key={d.id} value={d.driver_name}>{d.driver_name}</SelectItem>)}</SelectContent></Select></div>
-                                <div className="space-y-1"><Label className="required">Driver Loading Advance</Label><Input type="number" step="0.01" value={form.driver_loading_advance} onChange={e => setForm(f => ({ ...f, driver_loading_advance: e.target.value }))} /></div>
+                                {isDedicated ? (
+                                    <div className="space-y-1"><Label>Driver Name</Label><Input placeholder="Type driver name" value={form.driver_name} onChange={e => setForm(f => ({ ...f, driver_name: e.target.value }))} /></div>
+                                ) : (
+                                    <div className="space-y-1"><Label className={isCommissioned ? '' : 'required'}>Driver Name</Label><Select value={form.driver_name} onValueChange={v => setForm(f => ({ ...f, driver_name: v }))} disabled={isCommissioned}><SelectTrigger><SelectValue placeholder="Select driver" /></SelectTrigger><SelectContent>{drivers.map(d => <SelectItem key={d.id} value={d.driver_name}>{d.driver_name}</SelectItem>)}</SelectContent></Select></div>
+                                )}
+                                <div className="space-y-1"><Label className={isDedicated ? '' : 'required'}>Driver Loading Advance</Label><Input type="number" step="0.01" value={form.driver_loading_advance} onChange={e => setForm(f => ({ ...f, driver_loading_advance: e.target.value }))} /></div>
                                 <div className="space-y-1"><Label>TDS (Tax Deducted at Source)</Label><Input type="number" step="0.01" value={form.tds} onChange={e => setForm(f => ({ ...f, tds: e.target.value }))} /></div>
                                 <div className="space-y-1"><Label>Trip Balance</Label><Input disabled value={tripBalance} /></div>
                             </CardContent>
