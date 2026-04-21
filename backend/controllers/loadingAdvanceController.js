@@ -324,7 +324,7 @@ const createLoadingAdvance = async (req, res, next) => {
         if (!isCommissioned && !driver_name) return res.status(400).json({ success: false, message: 'Driver name is required' });
         const commission_pct = isCommissioned ? 6 : 0;
         const parsedDriverBata = Number(driver_bata) || 0;
-        const parsedUnloadingRate = Number(unloading) || 0;
+        const parsedUnloading = Number(unloading) || 0;
         const parsedTarpaulin = (String(vehicle_body_type || '').toLowerCase().includes('container')) ? 0 : (Number(tarpaulin) || 0);
         const parsedCityTax = Number(city_tax) || 0;
         const parsedMaintenance = Number(maintenance) || 0;
@@ -379,9 +379,8 @@ const createLoadingAdvance = async (req, res, next) => {
         }
 
         const parsedDriverLoadingAdvance = Number(driver_loading_advance) || 0;
-        const parsedUnloading = parsedUnloadingRate * parsedDriverLoadingAdvance;
         const sum_ifas = invoiceRows.reduce((s, r) => s + (Number(r.ifa_amount) || 0), 0);
-        const commission_amount = isCommissioned ? (sum_ifas * commission_pct) / 100 : 0;
+        const commission_amount = isCommissioned ? Math.ceil((sum_ifas * commission_pct) / 100) : 0;
         const expenseSum = parsedDriverBata + parsedUnloading + parsedTarpaulin + parsedCityTax + parsedMaintenance;
         const predefined_expenses = commission_amount + parsedUnloading + parsedTarpaulin + parsedCityTax + parsedMaintenance;
         const gross_amount = isCommissioned ? (commission_amount - expenseSum) : (sum_ifas - expenseSum);
@@ -461,7 +460,7 @@ const createLoadingAdvance = async (req, res, next) => {
                 kt_freight: inv.kt_freight,
                 driver_bata: parsedDriverBata,
                 advance: parsedDriverLoadingAdvance,
-                unloading: parsedUnloadingRate,
+                unloading: parsedUnloading,
                 tarpaulin: parsedTarpaulin,
                 city_tax: parsedCityTax,
                 maintenance: parsedMaintenance

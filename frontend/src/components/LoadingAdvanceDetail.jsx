@@ -82,7 +82,7 @@ const LoadingAdvanceDetail = () => {
     const maintenance = Number(voucher.maintenance) || 0;
     const expenseSum = driverBata + unloading + tarpaulin + cityTax + maintenance;
     const commissionPct = Number(voucher.commission_pct) || 0;
-    const commissionAmt = (sumIfas * commissionPct) / 100;
+    const commissionAmt = commissionPct > 0 ? Math.ceil((sumIfas * commissionPct) / 100) : 0;
     const grossAmount = commissionPct > 0 ? (commissionAmt - expenseSum) : (sumIfas - expenseSum);
     const fuelAmount = Number(voucher.fuel_amount) || 0;
     const tdsAmount = Number(voucher.tds) || 0;
@@ -237,11 +237,11 @@ const LoadingAdvanceDetail = () => {
                         </div>
                         <div className="space-y-1">
                             <Label className="text-slate-600">Commission %</Label>
-                            <Input disabled value={commissionPct.toFixed(2)} className="bg-slate-50" />
+                            <Input disabled value={commissionPct.toFixed(0)} className="bg-slate-50" />
                         </div>
                         <div className="space-y-1">
                             <Label className="text-slate-600">Commission Amount</Label>
-                            <Input disabled value={commissionAmt.toFixed(2)} className="bg-slate-50" />
+                            <Input disabled value={commissionAmt.toFixed(0)} className="bg-slate-50" />
                         </div>
                         <div className="space-y-1">
                             <Label className="text-slate-600">Driver Bata</Label>

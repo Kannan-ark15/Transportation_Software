@@ -45,15 +45,13 @@ const LoadingAdvance = () => {
     const isContainer = String(form.vehicle_body_type || '').toLowerCase().includes('container');
     const sumIfas = form.invoices.reduce((s, i) => s + (Number(i.quantity) || 0) * (Number(i.kt_freight) || 0), 0);
     const driverBata = Number(form.driver_bata) || 0;
-    const unloadingRate = Number(form.unloading) || 0;
-    const advanceValue = Number(form.driver_loading_advance) || 0;
-    const unloadingCharges = unloadingRate * advanceValue;
+    const unloadingCharges = Number(form.unloading) || 0;
     const tarpaulinVal = isContainer ? 0 : (Number(form.tarpaulin) || 0);
     const cityTax = Number(form.city_tax) || 0;
     const maintenance = Number(form.maintenance) || 0;
     const expenseSum = driverBata + unloadingCharges + tarpaulinVal + cityTax + maintenance;
     const ownerType = String(form.owner_type || '').toLowerCase(), isDedicated = ownerType === 'dedicated', isCommissioned = isDedicated || ownerType === 'market', commissionPct = isCommissioned ? 6 : 0;
-    const commissionAmt = (sumIfas * commissionPct) / 100;
+    const commissionAmt = isCommissioned ? Math.ceil((sumIfas * commissionPct) / 100) : 0;
     const grossAmountVal = isCommissioned ? (commissionAmt - expenseSum) : (sumIfas - expenseSum);
 
     const predefinedExpenses = (commissionAmt + unloadingCharges + tarpaulinVal + cityTax + maintenance).toFixed(2);
@@ -184,15 +182,13 @@ const LoadingAdvance = () => {
                         <Card className="border border-slate-100 shadow-none"><CardHeader className="pb-2 bg-accent/10 border-b border-accent/20 rounded-t-lg"><CardTitle className="text-lg text-accent">Charges & Predefined Trip Expenses</CardTitle></CardHeader>
                             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-1"><Label>Sum of all IFAs</Label><Input disabled value={sumIfas.toFixed(2)} /></div>
-                                <div className="space-y-1"><Label>Commission %</Label><Input disabled value={commissionPct.toFixed(2)} /></div>
-                                <div className="space-y-1"><Label>Commission Amount</Label><Input disabled value={commissionAmt.toFixed(2)} /></div>
+                                <div className="space-y-1"><Label>Commission %</Label><Input disabled value={commissionPct.toFixed(0)} /></div>
+                                <div className="space-y-1"><Label>Commission Amount</Label><Input disabled value={commissionAmt.toFixed(0)} /></div>
                                 <div className="space-y-1"><Label className="required">Driver Bata</Label><Input type="number" step="0.01" value={form.driver_bata} onChange={e => setForm(f => ({ ...f, driver_bata: e.target.value }))} /></div>
                                 <div className="space-y-1"><Label className="required">Unloading Charges (Place Master Rate)</Label><Input type="number" step="0.01" value={form.unloading} onChange={e => setForm(f => ({ ...f, unloading: e.target.value }))} /></div>
                                 <div className="space-y-1"><Label>Tarpaulin</Label><Input type="number" step="0.01" disabled={isContainer} value={isContainer ? 0 : form.tarpaulin} onChange={e => setForm(f => ({ ...f, tarpaulin: e.target.value }))} /></div>
                                 <div className="space-y-1"><Label>City Tax</Label><Input type="number" step="0.01" value={form.city_tax} onChange={e => setForm(f => ({ ...f, city_tax: e.target.value }))} /></div>
                                 <div className="space-y-1"><Label>Maintenance</Label><Input type="number" step="0.01" value={form.maintenance} onChange={e => setForm(f => ({ ...f, maintenance: e.target.value }))} /></div>
-
-                                <div className="space-y-1"><Label>Calculated Unloading Charges (Rate x Advance)</Label><Input disabled value={unloadingCharges.toFixed(2)} /></div>
                                 <div className="space-y-1"><Label>Predefined Expenses</Label><Input disabled value={predefinedExpenses} /></div>
                             </CardContent>
                         </Card>
