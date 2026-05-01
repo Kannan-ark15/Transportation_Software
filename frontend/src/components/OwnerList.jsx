@@ -170,10 +170,10 @@ const OwnerList = () => {
 
     const validate = () => {
         const errors = {};
-        const mandatoryFields = ['owner_type', 'owner_name', 'bank_name', 'branch', 'account_no', 'ifsc_code'];
+        const mandatoryFields = ['owner_type', 'owner_name'];
 
         if (!isMarketOwnerType(formData.owner_type)) {
-            mandatoryFields.push('pan_no', 'aadhar_no', 'company_address', 'place', 'contact_no');
+            mandatoryFields.push('pan_no', 'aadhar_no', 'company_address', 'place', 'contact_no', 'bank_name', 'branch', 'account_no', 'ifsc_code');
         }
 
         mandatoryFields.forEach(field => {
@@ -475,7 +475,7 @@ const OwnerList = () => {
                                 </div>
                                 {isMarketOwner && (
                                     <p className="text-xs text-slate-500">
-                                        PAN, Aadhar, address, place, contact number, and email address can be left blank for Market owners.
+                                        PAN, Aadhar, address, place, contact number, email address, and bank details can be left blank for Market owners.
                                     </p>
                                 )}
 
@@ -573,24 +573,32 @@ const OwnerList = () => {
                                 </h4>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="bank_name" className="required">Bank Name</Label>
+                                        <Label htmlFor="bank_name" className={cn(!isMarketOwner && "required")}>
+                                            Bank Name{isMarketOwner ? ' (Optional)' : ''}
+                                        </Label>
                                         <Input id="bank_name" value={formData.bank_name} onChange={e => setFormData({ ...formData, bank_name: e.target.value })} />
                                         {formErrors.bank_name && <p className="text-[10px] text-red-500">{formErrors.bank_name}</p>}
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="branch" className="required">Branch</Label>
+                                        <Label htmlFor="branch" className={cn(!isMarketOwner && "required")}>
+                                            Branch{isMarketOwner ? ' (Optional)' : ''}
+                                        </Label>
                                         <Input id="branch" value={formData.branch} onChange={e => setFormData({ ...formData, branch: e.target.value })} />
                                         {formErrors.branch && <p className="text-[10px] text-red-500">{formErrors.branch}</p>}
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="account_no" className="required">Account Number</Label>
+                                        <Label htmlFor="account_no" className={cn(!isMarketOwner && "required")}>
+                                            Account Number{isMarketOwner ? ' (Optional)' : ''}
+                                        </Label>
                                         <Input id="account_no" value={formData.account_no} onChange={e => setFormData({ ...formData, account_no: e.target.value })} className="font-mono" />
                                         {formErrors.account_no && <p className="text-[10px] text-red-500">{formErrors.account_no}</p>}
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="ifsc_code" className="required">IFSC Code</Label>
+                                        <Label htmlFor="ifsc_code" className={cn(!isMarketOwner && "required")}>
+                                            IFSC Code{isMarketOwner ? ' (Optional)' : ''}
+                                        </Label>
                                         <Input id="ifsc_code" value={formData.ifsc_code} onChange={e => setFormData({ ...formData, ifsc_code: e.target.value.toUpperCase() })} className="font-mono" maxLength={11} />
                                         {formErrors.ifsc_code && <p className="text-[10px] text-red-500">{formErrors.ifsc_code}</p>}
                                     </div>

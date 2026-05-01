@@ -32,22 +32,23 @@ const normalizeOwnerPayload = (body = {}) => ({
 const validateOwnerPayload = (ownerData) => {
     const errors = [];
     const allowedOwnerTypes = ['Own', 'Dedicated', 'Market'];
+    const isMarketOwner = isMarketOwnerType(ownerData.owner_type);
 
     if (!ownerData.owner_type) errors.push('Owner type is required');
     else if (!allowedOwnerTypes.includes(ownerData.owner_type)) errors.push('Owner type must be Own, Dedicated, or Market');
 
     if (!ownerData.owner_name) errors.push('Owner name is required');
-    if (!ownerData.bank_name) errors.push('Bank name is required');
-    if (!ownerData.branch) errors.push('Branch is required');
-    if (!ownerData.account_no) errors.push('Account number is required');
-    if (!ownerData.ifsc_code) errors.push('IFSC code is required');
 
-    if (!isMarketOwnerType(ownerData.owner_type)) {
+    if (!isMarketOwner) {
         if (!ownerData.pan_no) errors.push('PAN number is required for Own and Dedicated owners');
         if (!ownerData.aadhar_no) errors.push('Aadhar number is required for Own and Dedicated owners');
         if (!ownerData.company_address) errors.push('Company address is required for Own and Dedicated owners');
         if (!ownerData.place) errors.push('Place is required for Own and Dedicated owners');
         if (!ownerData.contact_no) errors.push('Contact number is required for Own and Dedicated owners');
+        if (!ownerData.bank_name) errors.push('Bank name is required for Own and Dedicated owners');
+        if (!ownerData.branch) errors.push('Branch is required for Own and Dedicated owners');
+        if (!ownerData.account_no) errors.push('Account number is required for Own and Dedicated owners');
+        if (!ownerData.ifsc_code) errors.push('IFSC code is required for Own and Dedicated owners');
     }
 
     if (ownerData.pan_no && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(ownerData.pan_no)) {
