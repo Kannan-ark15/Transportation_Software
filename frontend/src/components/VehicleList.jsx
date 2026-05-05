@@ -117,6 +117,13 @@ const VehicleList = () => {
         '16 WHEELER': ['Open Container', 'Container', 'Bulker'],
         '22 WHEELER': ['Trailer', 'Container']
     };
+
+    const isMarketVehicleEntry = useMemo(() => {
+        const ownerType = String(formData.own_dedicated || '').trim().toLowerCase();
+        const vehicleType = String(formData.vehicle_type || '').trim().toLowerCase();
+        return ownerType === 'market' || vehicleType === 'market';
+    }, [formData.own_dedicated, formData.vehicle_type]);
+
     useEffect(() => {
         loadVehicles();
         loadOwners();
@@ -363,11 +370,13 @@ const VehicleList = () => {
 
     const validate = () => {
         const errors = {};
-        const mandatoryFields = [
-            'vehicle_no', 'vehicle_type', 'vehicle_sub_type', 'vehicle_body_type',
-            'brand_name', 'own_dedicated', 'owner_name', 'recommended_km',
-            'insurance_no', 'insurance_base_value'
-        ];
+        const mandatoryFields = isMarketVehicleEntry
+            ? ['vehicle_no']
+            : [
+                'vehicle_no', 'vehicle_type', 'vehicle_sub_type', 'vehicle_body_type',
+                'brand_name', 'own_dedicated', 'owner_name', 'recommended_km',
+                'insurance_no', 'insurance_base_value'
+            ];
 
         mandatoryFields.forEach(field => {
             if (!formData[field] || String(formData[field]).trim() === '') {
@@ -581,7 +590,7 @@ const VehicleList = () => {
                                     {formErrors.vehicle_no && <p className="text-[10px] text-red-500">{formErrors.vehicle_no}</p>}
                                 </div>
                                 <div className="space-y-2">
-                                    <Label className="required">Vehicle Type</Label>
+                                    <Label className={cn(!isMarketVehicleEntry && "required")}>Vehicle Type</Label>
                                     <Select value={formData.vehicle_type} onValueChange={val => setFormData({ ...formData, vehicle_type: val, vehicle_sub_type: '', vehicle_body_type: '' })}>
                                         <SelectTrigger className={cn(formErrors.vehicle_type && "border-red-500")}>
                                             <SelectValue placeholder="Select Type" />
@@ -593,7 +602,7 @@ const VehicleList = () => {
                                     {formErrors.vehicle_type && <p className="text-[10px] text-red-500">{formErrors.vehicle_type}</p>}
                                 </div>
                                 <div className="space-y-2">
-                                    <Label className="required">Vehicle Sub Type</Label>
+                                    <Label className={cn(!isMarketVehicleEntry && "required")}>Vehicle Sub Type</Label>
                                     <Select
                                         value={formData.vehicle_sub_type}
                                         onValueChange={val => setFormData({ ...formData, vehicle_sub_type: val, vehicle_body_type: '' })}
@@ -612,7 +621,7 @@ const VehicleList = () => {
 
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div className="space-y-2">
-                                    <Label className="required">Body Type</Label>
+                                    <Label className={cn(!isMarketVehicleEntry && "required")}>Body Type</Label>
                                     <Select
                                         value={formData.vehicle_body_type}
                                         onValueChange={val => setFormData({ ...formData, vehicle_body_type: val })}
@@ -628,12 +637,12 @@ const VehicleList = () => {
                                     {formErrors.vehicle_body_type && <p className="text-[10px] text-red-500">{formErrors.vehicle_body_type}</p>}
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="brand_name" className="required">Brand Name</Label>
+                                    <Label htmlFor="brand_name" className={cn(!isMarketVehicleEntry && "required")}>Brand Name</Label>
                                     <Input id="brand_name" value={formData.brand_name} onChange={e => setFormData({ ...formData, brand_name: e.target.value })} placeholder="e.g. Tata, Ashok Leyland" />
                                     {formErrors.brand_name && <p className="text-[10px] text-red-500">{formErrors.brand_name}</p>}
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="recommended_km" className="required">Recommended KM (One Side)</Label>
+                                    <Label htmlFor="recommended_km" className={cn(!isMarketVehicleEntry && "required")}>Recommended KM (One Side)</Label>
                                     <Input id="recommended_km" type="number" step="0.01" value={formData.recommended_km} onChange={e => setFormData({ ...formData, recommended_km: e.target.value })} placeholder="0.00" />
                                     {formErrors.recommended_km && <p className="text-[10px] text-red-500">{formErrors.recommended_km}</p>}
                                 </div>
@@ -641,7 +650,7 @@ const VehicleList = () => {
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label className="required">Own / Dedicated</Label>
+                                    <Label className={cn(!isMarketVehicleEntry && "required")}>Own / Dedicated</Label>
                                     <Select
                                         value={formData.own_dedicated}
                                         onValueChange={val => setFormData({ ...formData, own_dedicated: val, owner_name: '' })}
@@ -658,7 +667,7 @@ const VehicleList = () => {
                                     {formErrors.own_dedicated && <p className="text-[10px] text-red-500">{formErrors.own_dedicated}</p>}
                                 </div>
                                 <div className="space-y-2">
-                                    <Label className="required">Owner Name</Label>
+                                    <Label className={cn(!isMarketVehicleEntry && "required")}>Owner Name</Label>
                                     <Select
                                         value={formData.owner_name}
                                         onValueChange={val => setFormData({ ...formData, owner_name: val })}
@@ -799,11 +808,11 @@ const VehicleList = () => {
                             </h4>
                             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
                                 <div className="space-y-2 col-span-2">
-                                    <Label htmlFor="insurance_no" className="required">Policy Number</Label>
+                                    <Label htmlFor="insurance_no" className={cn(!isMarketVehicleEntry && "required")}>Policy Number</Label>
                                     <Input id="insurance_no" value={formData.insurance_no} onChange={e => setFormData({ ...formData, insurance_no: e.target.value })} />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="base_value" className="required">Base Value</Label>
+                                    <Label htmlFor="base_value" className={cn(!isMarketVehicleEntry && "required")}>Base Value</Label>
                                     <Input id="base_value" type="number" value={formData.insurance_base_value} onChange={e => setFormData({ ...formData, insurance_base_value: e.target.value })} />
                                 </div>
                                 <div className="space-y-2">
@@ -815,7 +824,7 @@ const VehicleList = () => {
                                     <Input value={formData.gst_value} disabled className="bg-slate-50 font-semibold" />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label className="required">Insurance Amount</Label>
+                                    <Label className={cn(!isMarketVehicleEntry && "required")}>Insurance Amount</Label>
                                     <Input value={formData.insurance_amount} disabled className="bg-slate-50 font-bold text-blue-600" />
                                 </div>
                             </div>
@@ -848,7 +857,9 @@ const VehicleList = () => {
 
                         <DialogFooter className="pt-8 border-t border-slate-100 flex items-center justify-between">
                             <div className="text-[10px] text-slate-400 font-medium">
-                                * Mandatory fields must be completed before saving.
+                                {isMarketVehicleEntry
+                                    ? '* For Market entries, only Vehicle Number is mandatory.'
+                                    : '* Mandatory fields must be completed before saving.'}
                             </div>
                             <div className="flex gap-3">
                                 <Button type="button" variant="outline" onClick={() => setModalOpen(false)} disabled={submitting}>
