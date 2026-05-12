@@ -9,6 +9,24 @@ const api = axios.create({
     },
 });
 
+api.interceptors.response.use((response) => {
+    const contentType = String(response.headers?.['content-type'] || '').toLowerCase();
+    const isHtmlResponse = contentType.includes('text/html')
+        || (typeof response.data === 'string' && response.data.trim().startsWith('<'));
+
+    if (isHtmlResponse) {
+        const message = 'API returned the frontend page instead of JSON. Set VITE_API_URL to the backend /api URL or configure an /api rewrite.';
+        const error = new Error(message);
+        error.response = {
+            ...response,
+            data: { success: false, message },
+        };
+        return Promise.reject(error);
+    }
+
+    return response;
+});
+
 const generateCRUD = (endpoint) => ({
     getAll: async () => {
         const response = await api.get(endpoint);

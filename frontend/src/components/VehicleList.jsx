@@ -124,6 +124,25 @@ const VehicleList = () => {
         return ownerType === 'market' || vehicleType === 'market';
     }, [formData.own_dedicated, formData.vehicle_type]);
 
+    const isDedicatedVehicleEntry = useMemo(() => {
+        return String(formData.own_dedicated || '').trim().toLowerCase() === 'dedicated';
+    }, [formData.own_dedicated]);
+
+    const isInsuranceRequired = useMemo(() => {
+        return !isMarketVehicleEntry && !isDedicatedVehicleEntry;
+    }, [isMarketVehicleEntry, isDedicatedVehicleEntry]);
+
+    useEffect(() => {
+        if (isInsuranceRequired) return;
+
+        setFormErrors(prev => {
+            if (!prev.insurance_no && !prev.insurance_base_value) return prev;
+
+            const { insurance_no, insurance_base_value, ...remainingErrors } = prev;
+            return remainingErrors;
+        });
+    }, [isInsuranceRequired]);
+
     useEffect(() => {
         loadVehicles();
         loadOwners();
@@ -375,7 +394,7 @@ const VehicleList = () => {
             : [
                 'vehicle_no', 'vehicle_type', 'vehicle_sub_type', 'vehicle_body_type',
                 'brand_name', 'own_dedicated', 'owner_name', 'recommended_km',
-                'insurance_no', 'insurance_base_value'
+                ...(isInsuranceRequired ? ['insurance_no', 'insurance_base_value'] : [])
             ];
 
         mandatoryFields.forEach(field => {
@@ -808,11 +827,11 @@ const VehicleList = () => {
                             </h4>
                             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
                                 <div className="space-y-2 col-span-2">
-                                    <Label htmlFor="insurance_no" className={cn(!isMarketVehicleEntry && "required")}>Policy Number</Label>
+                                    <Label htmlFor="insurance_no" className={cn(isInsuranceRequired && "required")}>Policy Number</Label>
                                     <Input id="insurance_no" value={formData.insurance_no} onChange={e => setFormData({ ...formData, insurance_no: e.target.value })} />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="base_value" className={cn(!isMarketVehicleEntry && "required")}>Base Value</Label>
+                                    <Label htmlFor="base_value" className={cn(isInsuranceRequired && "required")}>Base Value</Label>
                                     <Input id="base_value" type="number" value={formData.insurance_base_value} onChange={e => setFormData({ ...formData, insurance_base_value: e.target.value })} />
                                 </div>
                                 <div className="space-y-2">
@@ -824,7 +843,7 @@ const VehicleList = () => {
                                     <Input value={formData.gst_value} disabled className="bg-slate-50 font-semibold" />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label className={cn(!isMarketVehicleEntry && "required")}>Insurance Amount</Label>
+                                    <Label className={cn(isInsuranceRequired && "required")}>Insurance Amount</Label>
                                     <Input value={formData.insurance_amount} disabled className="bg-slate-50 font-bold text-blue-600" />
                                 </div>
                             </div>
@@ -859,6 +878,8 @@ const VehicleList = () => {
                             <div className="text-[10px] text-slate-400 font-medium">
                                 {isMarketVehicleEntry
                                     ? '* For Market entries, only Vehicle Number is mandatory.'
+                                    : isDedicatedVehicleEntry
+                                        ? '* Insurance details are optional for Dedicated entries.'
                                     : '* Mandatory fields must be completed before saving.'}
                             </div>
                             <div className="flex gap-3">

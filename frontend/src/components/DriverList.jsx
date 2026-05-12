@@ -82,7 +82,8 @@ const DriverList = () => {
             setLoading(true);
             const res = await driverAPI.getAll();
             if (res.success) setDrivers(res.data);
-        } catch (err) { setError('Failed to load drivers'); }
+            else setError(res.message || 'Failed to load drivers');
+        } catch (err) { setError(err.response?.data?.message || 'Failed to load drivers'); }
         finally { setLoading(false); }
     };
 

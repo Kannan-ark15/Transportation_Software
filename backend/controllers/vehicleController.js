@@ -49,6 +49,14 @@ const isMarketVehicleEntry = (vehicleData) => {
     return ownerType === 'market' || vehicleType === 'market';
 };
 
+const isDedicatedVehicleEntry = (vehicleData) => {
+    return String(vehicleData.own_dedicated || '').trim().toLowerCase() === 'dedicated';
+};
+
+const isInsuranceRequired = (vehicleData) => {
+    return !isMarketVehicleEntry(vehicleData) && !isDedicatedVehicleEntry(vehicleData);
+};
+
 const normalizeVehiclePayload = (body = {}) => {
     const normalized = {};
 
@@ -87,7 +95,9 @@ const validateVehiclePayload = (vehicleData) => {
         'brand_name',
         'own_dedicated',
         'owner_name',
-        'recommended_km',
+        'recommended_km'
+    ];
+    const insuranceRequiredFields = [
         'insurance_no',
         'insurance_base_value'
     ];
@@ -99,7 +109,11 @@ const validateVehiclePayload = (vehicleData) => {
     }
 
     if (!isMarketVehicle) {
-        nonMarketRequiredFields.forEach((field) => {
+        const requiredFields = isInsuranceRequired(vehicleData)
+            ? [...nonMarketRequiredFields, ...insuranceRequiredFields]
+            : nonMarketRequiredFields;
+
+        requiredFields.forEach((field) => {
             const value = vehicleData[field];
             const isEmpty = value === null || value === undefined || (typeof value === 'string' && value.trim() === '');
             if (isEmpty) {

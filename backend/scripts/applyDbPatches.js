@@ -1,25 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 const { Pool } = require('pg');
+const { buildPoolConfig } = require('../config/poolConfig');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
-
-const buildPoolConfig = () => {
-    if (process.env.DATABASE_URL) {
-        return {
-            connectionString: process.env.DATABASE_URL,
-            ssl: { rejectUnauthorized: false }
-        };
-    }
-
-    return {
-        host: process.env.DB_HOST || 'localhost',
-        port: process.env.DB_PORT || 5432,
-        database: process.env.DB_NAME || 'transport_db',
-        user: process.env.DB_USER || 'postgres',
-        password: process.env.DB_PASSWORD,
-        max: 10
-    };
-};
 
 const ensurePatchTable = async (client) => {
     await client.query(`
@@ -40,7 +23,7 @@ const getPatchFiles = async (dirPath) => {
 };
 
 const applyPatches = async () => {
-    const pool = new Pool(buildPoolConfig());
+    const pool = new Pool(buildPoolConfig({ max: 10 }));
     const client = await pool.connect();
     const configDir = path.join(__dirname, '..', 'config');
 
