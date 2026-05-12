@@ -56,6 +56,21 @@ import { showAlert, showConfirm } from '@/lib/dialogService';
 
 const isMarketOwnerType = (value) => String(value || '').trim().toLowerCase() === 'market';
 
+const createEmptyOwnerForm = () => ({
+    owner_type: 'Own', owner_name: '', pan_no: '', aadhar_no: '', gst_no: '',
+    company_address: '', place: '', contact_no: '', email_id: '',
+    bank_name: '', branch: '', account_no: '', ifsc_code: '', status: 'Active'
+});
+
+const normalizeOwnerFormData = (owner = {}) => {
+    const emptyForm = createEmptyOwnerForm();
+
+    return Object.keys(emptyForm).reduce((form, field) => {
+        form[field] = owner[field] ?? emptyForm[field];
+        return form;
+    }, {});
+};
+
 const OwnerList = () => {
     const [owners, setOwners] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -73,11 +88,7 @@ const OwnerList = () => {
     const [selectedOwner, setSelectedOwner] = useState(null);
     const [submitting, setSubmitting] = useState(false);
 
-    const [formData, setFormData] = useState({
-        owner_type: 'Own', owner_name: '', pan_no: '', aadhar_no: '', gst_no: '',
-        company_address: '', place: '', contact_no: '', email_id: '',
-        bank_name: '', branch: '', account_no: '', ifsc_code: '', status: 'Active'
-    });
+    const [formData, setFormData] = useState(createEmptyOwnerForm);
 
     const [formErrors, setFormErrors] = useState({});
     const isMarketOwner = isMarketOwnerType(formData.owner_type);
@@ -157,13 +168,9 @@ const OwnerList = () => {
         setSelectedOwner(owner);
         setFormErrors({});
         if (owner) {
-            setFormData({ ...owner });
+            setFormData(normalizeOwnerFormData(owner));
         } else {
-            setFormData({
-                owner_type: 'Own', owner_name: '', pan_no: '', aadhar_no: '', gst_no: '',
-                company_address: '', place: '', contact_no: '', email_id: '',
-                bank_name: '', branch: '', account_no: '', ifsc_code: '', status: 'Active'
-            });
+            setFormData(createEmptyOwnerForm());
         }
         setModalOpen(true);
     };

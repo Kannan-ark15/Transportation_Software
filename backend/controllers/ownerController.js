@@ -1,32 +1,38 @@
 const pool = require('../config/database');
 
+const normalizeText = (value) => String(value ?? '').trim();
+const normalizeOptionalText = (value, transform = (text) => text) => {
+    const text = normalizeText(value);
+    return text ? transform(text) : null;
+};
+
 const isMarketOwnerType = (value) => String(value || '').trim().toLowerCase() === 'market';
 
 const normalizeOwnerType = (value) => {
-    const normalized = String(value || '').trim().toLowerCase();
+    const normalized = normalizeText(value).toLowerCase();
 
     if (normalized === 'own') return 'Own';
     if (normalized === 'dedicated') return 'Dedicated';
     if (normalized === 'market') return 'Market';
 
-    return String(value || '').trim();
+    return normalizeText(value);
 };
 
 const normalizeOwnerPayload = (body = {}) => ({
-    owner_name: String(body.owner_name || '').trim(),
+    owner_name: normalizeText(body.owner_name),
     owner_type: normalizeOwnerType(body.owner_type),
-    pan_no: String(body.pan_no || '').trim().toUpperCase(),
-    aadhar_no: String(body.aadhar_no || '').trim(),
-    gst_no: String(body.gst_no || '').trim().toUpperCase(),
-    company_address: String(body.company_address || '').trim(),
-    place: String(body.place || '').trim(),
-    contact_no: String(body.contact_no || '').trim(),
-    email_id: String(body.email_id || '').trim(),
-    bank_name: String(body.bank_name || '').trim(),
-    branch: String(body.branch || '').trim(),
-    ifsc_code: String(body.ifsc_code || '').trim().toUpperCase(),
-    account_no: String(body.account_no || '').trim(),
-    status: String(body.status || 'Active').trim() || 'Active',
+    pan_no: normalizeOptionalText(body.pan_no, (text) => text.toUpperCase()),
+    aadhar_no: normalizeOptionalText(body.aadhar_no),
+    gst_no: normalizeOptionalText(body.gst_no, (text) => text.toUpperCase()),
+    company_address: normalizeOptionalText(body.company_address),
+    place: normalizeOptionalText(body.place),
+    contact_no: normalizeOptionalText(body.contact_no),
+    email_id: normalizeOptionalText(body.email_id),
+    bank_name: normalizeOptionalText(body.bank_name),
+    branch: normalizeOptionalText(body.branch),
+    ifsc_code: normalizeOptionalText(body.ifsc_code, (text) => text.toUpperCase()),
+    account_no: normalizeOptionalText(body.account_no),
+    status: normalizeText(body.status || 'Active') || 'Active',
 });
 
 const validateOwnerPayload = (ownerData) => {
