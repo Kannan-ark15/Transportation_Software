@@ -3,6 +3,7 @@ const router = express.Router();
 
 const {
     getGstInvoiceMeta,
+    getGstInvoicePeriodSummary,
     getAllGstInvoices,
     getGstInvoiceById,
     createGstInvoice,
@@ -11,6 +12,7 @@ const {
 } = require('../controllers/gstInvoiceController');
 
 router.get('/meta', getGstInvoiceMeta);
+router.get('/period-summary', getGstInvoicePeriodSummary);
 router.get('/', getAllGstInvoices);
 router.get('/:id', getGstInvoiceById);
 router.post('/', createGstInvoice);

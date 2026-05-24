@@ -167,6 +167,16 @@ export const gstInvoiceAPI = {
         const response = await api.get('/gst-invoices/meta');
         return response.data;
     },
+    getPeriodSummary: async (params = {}) => {
+        const query = {
+            ...params,
+            product_ids: Array.isArray(params.product_ids)
+                ? params.product_ids.join(',')
+                : params.product_ids
+        };
+        const response = await api.get('/gst-invoices/period-summary', { params: query });
+        return response.data;
+    },
     updateFilingStatus: async (id, filing_status) => {
         const response = await api.patch(`/gst-invoices/${id}/filing-status`, { filing_status });
         return response.data;

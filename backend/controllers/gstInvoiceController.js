@@ -17,6 +17,21 @@ const normalizeText = (value) => {
     return str === '' ? null : str;
 };
 
+const normalizeProductIdList = (value) => {
+    if (value === null || value === undefined || value === '') return [];
+    const rawList = Array.isArray(value) ? value : String(value).split(',');
+    const unique = new Set();
+
+    for (const item of rawList) {
+        const parsed = Number(String(item || '').trim());
+        if (Number.isInteger(parsed) && parsed > 0) {
+            unique.add(parsed);
+        }
+    }
+
+    return Array.from(unique);
+};
+
 const isValidDateString = (value) => {
     if (!value) return false;
     const d = new Date(value);
@@ -37,6 +52,24 @@ const getFilingPeriod = (dateString) => {
     const month = date.getMonth() + 1;
     if (month >= 4) return `${year}-${year + 1}`;
     return `${year - 1}-${year}`;
+};
+
+const fetchProductsByIds = async (client, productIds = []) => {
+    if (!Array.isArray(productIds) || productIds.length === 0) return [];
+
+    const result = await client.query(
+        `SELECT id, product_name
+         FROM products
+         WHERE id = ANY($1::INT[])
+         ORDER BY product_name ASC`,
+        [productIds]
+    );
+
+    if (result.rows.length !== productIds.length) {
+        throw new Error('One or more selected products were not found');
+    }
+
+    return result.rows;
 };
 
 const getNextBillNumberFromMax = (maxBillNumber) => {
@@ -125,21 +158,52 @@ const getOwnerForGstHeader = async (client) => {
     return ownerRes.rows[0] || null;
 };
 
-const getInvoicePeriodTotals = async (client, fromDate, toDate) => {
+const getInvoicePeriodTotals = async (client, fromDate, toDate, productNames = []) => {
+    const values = [fromDate, toDate];
+    let productFilterClause = '';
+
+    if (Array.isArray(productNames) && productNames.length > 0) {
+        const normalizedProductNames = productNames
+            .map((name) => String(name || '').trim().toLowerCase())
+            .filter((name) => name !== '');
+        values.push(normalizedProductNames);
+        productFilterClause = ` AND LOWER(TRIM(COALESCE(la.product_name, ''))) = ANY($${values.length}::TEXT[])`;
+    }
+
     const totalsRes = await client.query(
         `SELECT
+            COALESCE(NULLIF(TRIM(la.product_name), ''), 'Unknown') AS product_name,
             COALESCE(SUM(lai.quantity), 0)::DECIMAL(12, 3) AS quantity_mt,
             COALESCE(SUM(lai.ifa_amount), 0)::DECIMAL(12, 2) AS amount_freight
          FROM loading_advance_invoices lai
          JOIN loading_advances la ON la.id = lai.loading_advance_id
-         WHERE la.invoice_date BETWEEN $1 AND $2`,
-        [fromDate, toDate]
+         WHERE la.invoice_date BETWEEN $1 AND $2${productFilterClause}
+         GROUP BY COALESCE(NULLIF(TRIM(la.product_name), ''), 'Unknown')
+         ORDER BY product_name ASC`,
+        values
     );
 
-    const row = totalsRes.rows[0] || {};
+    const productBreakup = (totalsRes.rows || []).map((row) => {
+        const quantityMt = round3(row.quantity_mt || 0);
+        const amountFreight = round2(row.amount_freight || 0);
+        return {
+            product_name: row.product_name,
+            quantity_mt: quantityMt,
+            amount_freight: amountFreight,
+            // Derived effective freight per MT from transactional totals.
+            rcl_freight: quantityMt > 0 ? round2(amountFreight / quantityMt) : 0
+        };
+    });
+
+    const totals = productBreakup.reduce((acc, row) => ({
+        quantity_mt: acc.quantity_mt + row.quantity_mt,
+        amount_freight: acc.amount_freight + row.amount_freight
+    }), { quantity_mt: 0, amount_freight: 0 });
+
     return {
-        quantity_mt: round3(row.quantity_mt || 0),
-        amount_freight: round2(row.amount_freight || 0)
+        quantity_mt: round3(totals.quantity_mt),
+        amount_freight: round2(totals.amount_freight),
+        product_breakup: productBreakup
     };
 };
 
@@ -154,14 +218,28 @@ const buildInvoiceRow = (row) => {
         sgst_percent: toNumber(row.sgst_percent, 0),
         sgst_amount: toNumber(row.sgst_amount, 0),
         total_gst: toNumber(row.total_gst, 0),
-        invoice_total: toNumber(row.invoice_total, 0)
+        invoice_total: toNumber(row.invoice_total, 0),
+        product_breakup: Array.isArray(row.product_breakup)
+            ? row.product_breakup.map((item) => ({
+                product_name: item.product_name,
+                quantity_mt: toNumber(item.quantity_mt, 0),
+                amount_freight: toNumber(item.amount_freight, 0),
+                rcl_freight: toNumber(item.rcl_freight, 0)
+            }))
+            : [],
+        selected_products: Array.isArray(row.selected_products)
+            ? row.selected_products.map((item) => ({
+                id: toNumber(item.id, 0),
+                product_name: item.product_name
+            }))
+            : []
     };
 };
 
 const getGstInvoiceMeta = async (req, res, next) => {
     const client = await pool.connect();
     try {
-        const [companyRes, owner, maxRes] = await Promise.all([
+        const [companyRes, owner, maxRes, productRes] = await Promise.all([
             client.query(
                 `SELECT
                     id,
@@ -176,7 +254,12 @@ const getGstInvoiceMeta = async (req, res, next) => {
                  ORDER BY company_name ASC`
             ),
             getOwnerForGstHeader(client),
-            client.query('SELECT COALESCE(MAX(CAST(bill_number AS INTEGER)), 0) AS max_bill_number FROM gst_invoices')
+            client.query('SELECT COALESCE(MAX(CAST(bill_number AS INTEGER)), 0) AS max_bill_number FROM gst_invoices'),
+            client.query(
+                `SELECT id, product_name
+                 FROM products
+                 ORDER BY product_name ASC`
+            )
         ]);
 
         const nextBillNumber = getNextBillNumberFromMax(maxRes.rows[0]?.max_bill_number);
@@ -186,6 +269,7 @@ const getGstInvoiceMeta = async (req, res, next) => {
             data: {
                 owner,
                 companies: companyRes.rows || [],
+                products: productRes.rows || [],
                 defaults: {
                     cgst_percent: DEFAULT_CGST_PERCENT,
                     sgst_percent: DEFAULT_SGST_PERCENT,
@@ -194,6 +278,52 @@ const getGstInvoiceMeta = async (req, res, next) => {
             }
         });
     } catch (error) {
+        next(error);
+    } finally {
+        client.release();
+    }
+};
+
+const getGstInvoicePeriodSummary = async (req, res, next) => {
+    const client = await pool.connect();
+    try {
+        const fromDate = normalizeText(req.query?.from_date);
+        const toDate = normalizeText(req.query?.to_date);
+
+        if (!fromDate || !isValidDateString(fromDate)) {
+            return res.status(400).json({ success: false, message: 'Valid from_date is required' });
+        }
+        if (!toDate || !isValidDateString(toDate)) {
+            return res.status(400).json({ success: false, message: 'Valid to_date is required' });
+        }
+        if (compareDateOnly(toDate, fromDate) < 0) {
+            return res.status(400).json({ success: false, message: 'to_date must be greater than or equal to from_date' });
+        }
+
+        const hasProductFilter = req.query && Object.prototype.hasOwnProperty.call(req.query, 'product_ids');
+        const selectedProductIds = normalizeProductIdList(req.query?.product_ids);
+        if (hasProductFilter && selectedProductIds.length === 0) {
+            return res.status(400).json({ success: false, message: 'Please select at least one valid product' });
+        }
+
+        const selectedProducts = await fetchProductsByIds(client, selectedProductIds);
+        const selectedProductNames = selectedProducts.map((product) => product.product_name);
+
+        const periodTotals = await getInvoicePeriodTotals(client, fromDate, toDate, selectedProductNames);
+
+        res.status(200).json({
+            success: true,
+            data: {
+                from_date: fromDate,
+                to_date: toDate,
+                selected_products: selectedProducts,
+                ...periodTotals
+            }
+        });
+    } catch (error) {
+        if (error.message === 'One or more selected products were not found') {
+            return res.status(400).json({ success: false, message: error.message });
+        }
         next(error);
     } finally {
         client.release();
@@ -270,6 +400,7 @@ const createGstInvoice = async (req, res, next) => {
             from_date,
             to_date,
             sac_code,
+            product_ids,
             created_by
         } = req.body || {};
 
@@ -307,6 +438,12 @@ const createGstInvoice = async (req, res, next) => {
             return res.status(400).json({ success: false, message: 'sac_code is required' });
         }
 
+        const hasProductFilter = req.body && Object.prototype.hasOwnProperty.call(req.body, 'product_ids');
+        const selectedProductIds = normalizeProductIdList(product_ids);
+        if (hasProductFilter && selectedProductIds.length === 0) {
+            return res.status(400).json({ success: false, message: 'Please select at least one valid product' });
+        }
+
         const companyRes = await client.query(
             `SELECT
                 id,
@@ -325,7 +462,10 @@ const createGstInvoice = async (req, res, next) => {
             return res.status(400).json({ success: false, message: 'Selected consignee company not found' });
         }
 
-        const periodTotals = await getInvoicePeriodTotals(client, fromDate, toDate);
+        const selectedProducts = await fetchProductsByIds(client, selectedProductIds);
+        const selectedProductNames = selectedProducts.map((product) => product.product_name);
+
+        const periodTotals = await getInvoicePeriodTotals(client, fromDate, toDate, selectedProductNames);
 
         const amountFreight = round2(periodTotals.amount_freight);
         const quantityMt = round3(periodTotals.quantity_mt);
@@ -414,9 +554,16 @@ const createGstInvoice = async (req, res, next) => {
         await client.query('COMMIT');
         inTx = false;
 
-        res.status(201).json({ success: true, data: buildInvoiceRow(insertRes.rows[0]) });
+        const responseRow = buildInvoiceRow(insertRes.rows[0]);
+        responseRow.selected_products = selectedProducts;
+        responseRow.product_breakup = periodTotals.product_breakup;
+
+        res.status(201).json({ success: true, data: responseRow });
     } catch (error) {
         if (inTx) await client.query('ROLLBACK');
+        if (error.message === 'One or more selected products were not found') {
+            return res.status(400).json({ success: false, message: error.message });
+        }
         next(error);
     } finally {
         client.release();
@@ -474,6 +621,7 @@ const deleteGstInvoice = async (req, res, next) => {
 
 module.exports = {
     getGstInvoiceMeta,
+    getGstInvoicePeriodSummary,
     getAllGstInvoices,
     getGstInvoiceById,
     createGstInvoice,

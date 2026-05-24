@@ -71,12 +71,14 @@ const buildEmptyForm = (billNumber = '') => ({
     destination: '',
     from_date: '',
     to_date: '',
-    sac_code: ''
+    sac_code: '',
+    selected_product_ids: []
 });
 
 const GstInvoices = () => {
     const [invoices, setInvoices] = useState([]);
     const [companies, setCompanies] = useState([]);
+    const [products, setProducts] = useState([]);
     const [ownerInfo, setOwnerInfo] = useState(null);
     const [defaultConfig, setDefaultConfig] = useState({ next_bill_number: '' });
 
@@ -87,6 +89,9 @@ const GstInvoices = () => {
 
     const [formData, setFormData] = useState(buildEmptyForm(''));
     const [formErrors, setFormErrors] = useState({});
+    const [periodSummary, setPeriodSummary] = useState(null);
+    const [summaryLoading, setSummaryLoading] = useState(false);
+    const [summaryError, setSummaryError] = useState('');
 
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -111,12 +116,21 @@ const GstInvoices = () => {
             if (metaRes.success) {
                 const meta = metaRes.data || {};
                 const defaults = meta.defaults || {};
+                const productOptions = Array.isArray(meta.products) ? meta.products : [];
+                const defaultProductIds = productOptions
+                    .map((product) => Number(product.id))
+                    .filter((id) => Number.isInteger(id) && id > 0);
+
                 setCompanies(meta.companies || []);
+                setProducts(productOptions);
                 setOwnerInfo(meta.owner || null);
                 setDefaultConfig(defaults);
                 setFormData((prev) => ({
                     ...prev,
-                    bill_number: prev.bill_number || defaults.next_bill_number || ''
+                    bill_number: prev.bill_number || defaults.next_bill_number || '',
+                    selected_product_ids: prev.selected_product_ids.length > 0
+                        ? prev.selected_product_ids
+                        : defaultProductIds
                 }));
             }
 
@@ -134,6 +148,57 @@ const GstInvoices = () => {
         loadData();
     }, []);
 
+    const selectedProductsKey = useMemo(() => (
+        [...(formData.selected_product_ids || [])]
+            .map((id) => Number(id))
+            .filter((id) => Number.isInteger(id) && id > 0)
+            .sort((a, b) => a - b)
+            .join(',')
+    ), [formData.selected_product_ids]);
+
+    useEffect(() => {
+        const hasDates = Boolean(formData.from_date && formData.to_date);
+        const hasProducts = Array.isArray(formData.selected_product_ids) && formData.selected_product_ids.length > 0;
+        const invalidDateRange = hasDates && formData.to_date < formData.from_date;
+
+        if (!hasDates || !hasProducts || invalidDateRange) {
+            setPeriodSummary(null);
+            setSummaryError('');
+            setSummaryLoading(false);
+            return undefined;
+        }
+
+        let cancelled = false;
+        const loadSummary = async () => {
+            try {
+                setSummaryLoading(true);
+                setSummaryError('');
+                const res = await gstInvoiceAPI.getPeriodSummary({
+                    from_date: formData.from_date,
+                    to_date: formData.to_date,
+                    product_ids: formData.selected_product_ids
+                });
+                if (!cancelled && res.success) {
+                    setPeriodSummary(res.data);
+                }
+            } catch (err) {
+                if (!cancelled) {
+                    setPeriodSummary(null);
+                    setSummaryError(err.response?.data?.message || 'Failed to fetch product-wise freight summary');
+                }
+            } finally {
+                if (!cancelled) {
+                    setSummaryLoading(false);
+                }
+            }
+        };
+
+        loadSummary();
+        return () => {
+            cancelled = true;
+        };
+    }, [formData.from_date, formData.to_date, selectedProductsKey]);
+
     const selectedConsignee = useMemo(
         () => companies.find((company) => String(company.id) === String(formData.consignee_company_id)),
         [companies, formData.consignee_company_id]
@@ -148,6 +213,40 @@ const GstInvoices = () => {
         setFormData((prev) => ({ ...prev, [field]: value }));
     };
 
+    const toggleProductSelection = (productId) => {
+        const normalizedId = Number(productId);
+        if (!Number.isInteger(normalizedId) || normalizedId <= 0) return;
+
+        setFormData((prev) => {
+            const currentIds = Array.isArray(prev.selected_product_ids) ? prev.selected_product_ids : [];
+            const hasId = currentIds.some((id) => Number(id) === normalizedId);
+            const nextIds = hasId
+                ? currentIds.filter((id) => Number(id) !== normalizedId)
+                : [...currentIds, normalizedId];
+
+            return {
+                ...prev,
+                selected_product_ids: nextIds
+            };
+        });
+    };
+
+    const selectAllProducts = () => {
+        setFormData((prev) => ({
+            ...prev,
+            selected_product_ids: products
+                .map((product) => Number(product.id))
+                .filter((id) => Number.isInteger(id) && id > 0)
+        }));
+    };
+
+    const clearAllProducts = () => {
+        setFormData((prev) => ({
+            ...prev,
+            selected_product_ids: []
+        }));
+    };
+
     const validate = () => {
         const errors = {};
         const today = todayString();
@@ -157,6 +256,9 @@ const GstInvoices = () => {
 
         if (!formData.consignee_company_id) errors.consignee_company_id = 'Required';
         if (!String(formData.description_of_goods || '').trim()) errors.description_of_goods = 'Required';
+        if (!Array.isArray(formData.selected_product_ids) || formData.selected_product_ids.length === 0) {
+            errors.selected_product_ids = 'Select at least one product';
+        }
 
         if (!formData.from_date) errors.from_date = 'Required';
         if (!formData.to_date) errors.to_date = 'Required';
@@ -176,7 +278,10 @@ const GstInvoices = () => {
 
     const resetForm = (nextBill) => {
         setFormErrors({});
-        setFormData(buildEmptyForm(nextBill || defaultConfig.next_bill_number || ''));
+        setFormData((prev) => ({
+            ...buildEmptyForm(nextBill || defaultConfig.next_bill_number || ''),
+            selected_product_ids: prev.selected_product_ids
+        }));
     };
 
     const handleCreate = async (event) => {
@@ -192,6 +297,9 @@ const GstInvoices = () => {
             from_date: formData.from_date,
             to_date: formData.to_date,
             sac_code: String(formData.sac_code || '').trim(),
+            product_ids: (formData.selected_product_ids || [])
+                .map((id) => Number(id))
+                .filter((id) => Number.isInteger(id) && id > 0),
             created_by: authUser.id || null
         };
 
@@ -475,6 +583,46 @@ const GstInvoices = () => {
                                 {formErrors.to_date && <p className="text-[10px] text-red-500">{formErrors.to_date}</p>}
                             </div>
 
+                            <div className="space-y-2 md:col-span-2">
+                                <div className="flex items-center justify-between gap-2">
+                                    <Label className="required">Product Filter</Label>
+                                    <div className="flex items-center gap-2">
+                                        <Button type="button" size="sm" variant="outline" onClick={selectAllProducts}>
+                                            Select All
+                                        </Button>
+                                        <Button type="button" size="sm" variant="outline" onClick={clearAllProducts}>
+                                            Clear
+                                        </Button>
+                                    </div>
+                                </div>
+                                <div className="max-h-32 overflow-auto rounded-md border border-slate-200 bg-slate-50/40 p-2">
+                                    {products.length === 0 ? (
+                                        <p className="text-xs text-slate-500">No products available</p>
+                                    ) : (
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                            {products.map((product) => {
+                                                const productId = Number(product.id);
+                                                const isChecked = formData.selected_product_ids.some((id) => Number(id) === productId);
+                                                return (
+                                                    <label key={product.id} className="flex items-center gap-2 text-sm text-slate-700">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={isChecked}
+                                                            onChange={() => toggleProductSelection(productId)}
+                                                        />
+                                                        <span>{product.product_name}</span>
+                                                    </label>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                                <p className="text-[11px] text-slate-500">
+                                    {formData.selected_product_ids.length} product(s) selected
+                                </p>
+                                {formErrors.selected_product_ids && <p className="text-[10px] text-red-500">{formErrors.selected_product_ids}</p>}
+                            </div>
+
                             <div className="space-y-2">
                                 <Label>Consignee GST</Label>
                                 <Input
@@ -483,6 +631,61 @@ const GstInvoices = () => {
                                     value={selectedConsignee?.gst_no || '-'}
                                 />
                             </div>
+                        </div>
+
+                        <div className="rounded-md border border-slate-200 bg-slate-50/40 p-3 space-y-3">
+                            <div className="flex items-center justify-between">
+                                <p className="text-sm font-semibold text-slate-800">Selected Product Freight Summary</p>
+                                {summaryLoading && (
+                                    <span className="inline-flex items-center gap-1 text-xs text-slate-500">
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                        Calculating...
+                                    </span>
+                                )}
+                            </div>
+
+                            {summaryError ? (
+                                <div className="p-2 bg-red-50 border border-red-100 text-red-600 rounded-md text-xs">
+                                    {summaryError}
+                                </div>
+                            ) : !periodSummary ? (
+                                <p className="text-xs text-slate-500">
+                                    Select dates and at least one product to view quantity and freight summary.
+                                </p>
+                            ) : (
+                                <div className="rounded-md border border-slate-200 overflow-auto bg-white">
+                                    <Table>
+                                        <TableHeader className="bg-slate-50/70">
+                                            <TableRow>
+                                                <TableHead>Product</TableHead>
+                                                <TableHead className="text-right">Quantity (MT)</TableHead>
+                                                <TableHead className="text-right">RCL Freight / MT</TableHead>
+                                                <TableHead className="text-right">Amount (Freight)</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {(periodSummary.product_breakup || []).map((row) => (
+                                                <TableRow key={`product-summary-${row.product_name}`}>
+                                                    <TableCell>{row.product_name}</TableCell>
+                                                    <TableCell className="text-right">{toNumber(row.quantity_mt, 0).toFixed(3)}</TableCell>
+                                                    <TableCell className="text-right">{formatMoney(row.rcl_freight)}</TableCell>
+                                                    <TableCell className="text-right">{formatMoney(row.amount_freight)}</TableCell>
+                                                </TableRow>
+                                            ))}
+                                            <TableRow className="bg-slate-50">
+                                                <TableCell className="font-semibold">TOTAL</TableCell>
+                                                <TableCell className="text-right font-semibold">
+                                                    {toNumber(periodSummary.quantity_mt, 0).toFixed(3)}
+                                                </TableCell>
+                                                <TableCell></TableCell>
+                                                <TableCell className="text-right font-semibold">
+                                                    {formatMoney(periodSummary.amount_freight)}
+                                                </TableCell>
+                                            </TableRow>
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            )}
                         </div>
 
                         <div className="flex items-center gap-3 pt-2">
