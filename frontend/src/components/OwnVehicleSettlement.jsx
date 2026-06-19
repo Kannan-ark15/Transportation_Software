@@ -72,7 +72,6 @@ const OwnVehicleSettlement = () => {
     const getDriverBalance = (row) => {
         const manual = getManualFields(row.acknowledgement_id);
         const totalExpenses =
-            toNumber(row.driver_bata) +
             toNumber(row.unloading) +
             toNumber(row.tarpaulin) +
             toNumber(row.city_tax) +
@@ -80,8 +79,7 @@ const OwnVehicleSettlement = () => {
             toNumber(manual.parking_charges) +
             toNumber(manual.expenditure_1) +
             toNumber(manual.expenditure_2) +
-            toNumber(manual.expenditure_3) +
-            toNumber(row.fuel_amount);
+            toNumber(manual.expenditure_3);
 
         return Number((toNumber(row.driver_loading_advance) - totalExpenses).toFixed(2));
     };

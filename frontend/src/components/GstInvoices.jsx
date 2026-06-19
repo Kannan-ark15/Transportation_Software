@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import { gstInvoiceAPI } from '../services/api';
 import Pagination from './Pagination';
 import {
@@ -392,7 +392,7 @@ const GstInvoices = () => {
         doc.text(`GST Number: ${ownerGst}`, 14, 40);
         doc.text(`PAN Number: ${ownerPan}`, 14, 45);
 
-        doc.autoTable({
+        autoTable(doc, {
             startY: 50,
             theme: 'grid',
             styles: { fontSize: 8, cellPadding: 2 },
@@ -411,7 +411,7 @@ const GstInvoices = () => {
         });
 
         const serviceStart = doc.lastAutoTable.finalY + 5;
-        doc.autoTable({
+        autoTable(doc, {
             startY: serviceStart,
             head: [[
                 'S. No',
@@ -441,7 +441,7 @@ const GstInvoices = () => {
         });
 
         const declarationsStart = doc.lastAutoTable.finalY + 5;
-        doc.autoTable({
+        autoTable(doc, {
             startY: declarationsStart,
             theme: 'grid',
             styles: { fontSize: 8, cellPadding: 2 },

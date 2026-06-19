@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import { showAlert } from '@/lib/dialogService';
 
 // --- IMPORT FUNCTIONS ---
@@ -91,8 +91,8 @@ export const exportToPDF = (title, columns, data, fileName) => {
     });
 
     // Validating autoTable
-    if (doc.autoTable) {
-        doc.autoTable({
+    if (autoTable) {
+        autoTable(doc, {
             head: [tableColumn],
             body: tableRows,
             startY: 30,

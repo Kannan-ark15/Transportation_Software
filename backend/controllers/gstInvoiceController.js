@@ -174,7 +174,7 @@ const getInvoicePeriodTotals = async (client, fromDate, toDate, productNames = [
         `SELECT
             COALESCE(NULLIF(TRIM(la.product_name), ''), 'Unknown') AS product_name,
             COALESCE(SUM(lai.quantity), 0)::DECIMAL(12, 3) AS quantity_mt,
-            COALESCE(SUM(lai.ifa_amount), 0)::DECIMAL(12, 2) AS amount_freight
+            COALESCE(SUM(lai.quantity * (lai.kt_freight + 1)), 0)::DECIMAL(12, 2) AS amount_freight
          FROM loading_advance_invoices lai
          JOIN loading_advances la ON la.id = lai.loading_advance_id
          WHERE la.invoice_date BETWEEN $1 AND $2${productFilterClause}
