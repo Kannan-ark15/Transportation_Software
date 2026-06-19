@@ -3,11 +3,12 @@ import { acknowledgementAPI } from '../services/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, SearchX } from 'lucide-react';
+import { Edit, Loader2, SearchX } from 'lucide-react';
 
-const AcknowledgementTable = ({ refreshKey = 0 }) => {
+const AcknowledgementTable = ({ refreshKey = 0, onEdit }) => {
     const [rows, setRows] = useState([]), [loading, setLoading] = useState(true);
     const [voucher, setVoucher] = useState(''), [status, setStatus] = useState('All');
     useEffect(() => {
@@ -53,6 +54,7 @@ const AcknowledgementTable = ({ refreshKey = 0 }) => {
                                     <TableHead>Mileage</TableHead>
                                     <TableHead>Pending/Shortage Invoices</TableHead>
                                     <TableHead>Date</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -67,6 +69,11 @@ const AcknowledgementTable = ({ refreshKey = 0 }) => {
                                         <TableCell>{r.mileage === null || r.mileage === undefined ? '-' : Number(r.mileage).toFixed(3)}</TableCell>
                                         <TableCell>{r.pending_shortage_invoice_numbers || '-'}</TableCell>
                                         <TableCell className="text-xs">{r.created_at ? new Date(r.created_at).toLocaleDateString() : '-'}</TableCell>
+                                        <TableCell className="text-right">
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-blue-600 hover:bg-blue-50" onClick={() => onEdit?.(r)}>
+                                                <Edit className="h-4 w-4" />
+                                            </Button>
+                                        </TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>

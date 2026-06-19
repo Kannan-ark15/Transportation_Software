@@ -1,7 +1,6 @@
 const pool = require('../config/database');
 
 const READY_STATUS = 'Ready for Settlement';
-const COMMISSION_DEFAULT_PERCENT = 6;
 
 const toNumber = (value, fallback = 0) => {
     const parsed = Number(value);
@@ -39,6 +38,7 @@ const getReadyVouchers = async (req, res, next) => {
                     (SELECT SUM(lai.ifa_amount) FROM loading_advance_invoices lai WHERE lai.loading_advance_id = la.id),
                     0
                 )::DECIMAL(12,2) AS sum_ifas,
+                COALESCE(la.predefined_expenses, 0)::DECIMAL(12,2) AS total_deductions,
                 COALESCE(
                     (
                         SELECT string_agg(ai.invoice_number, ', ' ORDER BY ai.invoice_number)
@@ -96,7 +96,6 @@ const createSettlement = async (req, res, next) => {
             branch,
             account_no,
             ifsc_code,
-            commission_amount,
             selected_vouchers = []
         } = req.body;
 
@@ -148,7 +147,8 @@ const createSettlement = async (req, res, next) => {
                     la.sum_ifas,
                     (SELECT SUM(lai.ifa_amount) FROM loading_advance_invoices lai WHERE lai.loading_advance_id = la.id),
                     0
-                )::DECIMAL(12,2) AS sum_ifas
+                )::DECIMAL(12,2) AS sum_ifas,
+                COALESCE(la.predefined_expenses, 0)::DECIMAL(12,2) AS total_deductions
              FROM acknowledgements a
              JOIN loading_advances la ON la.id = a.loading_advance_id
              JOIN owners o ON o.owner_name = la.owner_name AND o.owner_type = la.owner_type
@@ -165,22 +165,17 @@ const createSettlement = async (req, res, next) => {
             return res.status(400).json({ success: false, message: 'One or more selected vouchers are not ready for settlement' });
         }
 
-        const sumIfas = voucherRes.rows.reduce((sum, row) => sum + toNumber(row.sum_ifas), 0);
-        const requestedCommissionAmount = commission_amount !== undefined && commission_amount !== null && commission_amount !== ''
-            ? toNumber(commission_amount, NaN)
-            : Number(((sumIfas * COMMISSION_DEFAULT_PERCENT) / 100).toFixed(2));
-        const safeCommissionAmount = Number.isFinite(requestedCommissionAmount)
-            ? Number(requestedCommissionAmount.toFixed(2))
-            : Number(((sumIfas * COMMISSION_DEFAULT_PERCENT) / 100).toFixed(2));
-        if (safeCommissionAmount < 0) {
-            return res.status(400).json({ success: false, message: 'Commission amount cannot be negative' });
+        const sumIfas = Number(voucherRes.rows.reduce((sum, row) => sum + toNumber(row.sum_ifas), 0).toFixed(2));
+        const totalDeductions = Number(voucherRes.rows.reduce((sum, row) => sum + toNumber(row.total_deductions), 0).toFixed(2));
+        if (totalDeductions < 0) {
+            return res.status(400).json({ success: false, message: 'Total deductions cannot be negative' });
         }
-        if (safeCommissionAmount > sumIfas) {
-            return res.status(400).json({ success: false, message: 'Commission amount cannot exceed sum of IFAs' });
+        if (totalDeductions > sumIfas) {
+            return res.status(400).json({ success: false, message: 'Total deductions cannot exceed sum of IFAs' });
         }
 
-        const settlementBalance = Number((sumIfas - safeCommissionAmount).toFixed(2));
-        const commissionPercent = sumIfas > 0 ? Number(((safeCommissionAmount / sumIfas) * 100).toFixed(4)) : COMMISSION_DEFAULT_PERCENT;
+        const settlementBalance = Number((sumIfas - totalDeductions).toFixed(2));
+        const deductionPercent = sumIfas > 0 ? Number(((totalDeductions / sumIfas) * 100).toFixed(4)) : 0;
 
         await client.query('BEGIN');
         inTx = true;
@@ -200,9 +195,9 @@ const createSettlement = async (req, res, next) => {
                 effectiveBranch,
                 effectiveAccountNo,
                 effectiveIfscCode,
-                Number(sumIfas.toFixed(2)),
-                commissionPercent,
-                safeCommissionAmount,
+                sumIfas,
+                deductionPercent,
+                totalDeductions,
                 settlementBalance,
                 true
             ]
@@ -215,9 +210,9 @@ const createSettlement = async (req, res, next) => {
 
         let totalFinalBalance = 0;
         for (const voucher of voucherRes.rows) {
-            const voucherSumIfa = toNumber(voucher.sum_ifas);
-            const voucherCommission = Number(((voucherSumIfa * commissionPercent) / 100).toFixed(2));
-            const voucherFinal = Number((voucherSumIfa - voucherCommission).toFixed(2));
+            const voucherSumIfa = Number(toNumber(voucher.sum_ifas).toFixed(2));
+            const voucherTotalDeductions = Number(toNumber(voucher.total_deductions).toFixed(2));
+            const voucherFinal = Number((voucherSumIfa - voucherTotalDeductions).toFixed(2));
             totalFinalBalance += voucherFinal;
             await client.query(voucherInsert, [
                 settlement.id,
@@ -225,8 +220,8 @@ const createSettlement = async (req, res, next) => {
                 voucher.loading_advance_id,
                 voucher.vehicle_number,
                 voucher.voucher_number,
-                Number(voucherSumIfa.toFixed(2)),
-                voucherCommission,
+                voucherSumIfa,
+                voucherTotalDeductions,
                 voucherFinal
             ]);
         }

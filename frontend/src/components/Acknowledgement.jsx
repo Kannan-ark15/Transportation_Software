@@ -14,12 +14,19 @@ const buildAcknowledgementNumber = (invoiceNumber = '') =>
     `ACK${String(invoiceNumber).replace(/\s+/g, '')}`;
 const getSystemDate = () => new Date().toISOString().split('T')[0];
 const isBlank = (value) => value === null || value === undefined || String(value).trim() === '';
+const toDateInput = (value) => {
+    if (!value) return getSystemDate();
+    return String(value).split('T')[0];
+};
+
+const emptyRunMetrics = { last_odometer: '', current_odometer: '' };
 
 const Acknowledgement = () => {
     const [loading, setLoading] = useState(true), [advances, setAdvances] = useState([]);
     const [voucherId, setVoucherId] = useState(''), [voucherInfo, setVoucherInfo] = useState(null), [invoices, setInvoices] = useState([]);
-    const [runMetrics, setRunMetrics] = useState({ last_odometer: '', current_odometer: '' });
-    const [modalOpen, setModalOpen] = useState(false), [submitting, setSubmitting] = useState(false), [error, setError] = useState(''), [success, setSuccess] = useState(''), [refreshKey, setRefreshKey] = useState(0);
+    const [runMetrics, setRunMetrics] = useState(emptyRunMetrics);
+    const [modalOpen, setModalOpen] = useState(false), [modalMode, setModalMode] = useState('add'), [editingAckId, setEditingAckId] = useState(null);
+    const [detailLoading, setDetailLoading] = useState(false), [submitting, setSubmitting] = useState(false), [error, setError] = useState(''), [success, setSuccess] = useState(''), [refreshKey, setRefreshKey] = useState(0);
 
     useEffect(() => { const load = async () => { try { setLoading(true); const res = await loadingAdvanceAPI.getAll(); if (res.success) setAdvances(res.data); } finally { setLoading(false); } }; load(); }, []);
     const totalIfa = useMemo(() => invoices.reduce((s, i) => s + (Number(i.ifa_amount) || 0), 0), [invoices]);
@@ -36,6 +43,53 @@ const Acknowledgement = () => {
         : null;
     const mileage = runKms === null ? null : (fuelLitre > 0 ? runKms / fuelLitre : 0);
 
+    const resetForm = () => {
+        setVoucherId('');
+        setVoucherInfo(null);
+        setInvoices([]);
+        setRunMetrics(emptyRunMetrics);
+        setModalMode('add');
+        setEditingAckId(null);
+        setError('');
+        setSuccess('');
+    };
+
+    const openAddModal = () => {
+        resetForm();
+        setModalOpen(true);
+    };
+
+    const hydrateDetail = (detail) => {
+        setVoucherId(String(detail.loading_advance_id || ''));
+        setVoucherInfo(detail || null);
+        setRunMetrics({
+            last_odometer: detail.last_odometer ?? '',
+            current_odometer: detail.current_odometer ?? ''
+        });
+        setInvoices((detail.invoices || []).map(inv => ({
+            ...inv,
+            acknowledgement_date: toDateInput(inv.acknowledgement_date),
+            acknowledgement_number: inv.acknowledgement_number || buildAcknowledgementNumber(inv.invoice_number),
+            returned_amount: inv.returned_amount ?? 0
+        })));
+    };
+
+    const openEditModal = async (row) => {
+        resetForm();
+        setModalMode('edit');
+        setEditingAckId(row.id);
+        setModalOpen(true);
+        try {
+            setDetailLoading(true);
+            const res = await acknowledgementAPI.getById(row.id);
+            if (res.success) hydrateDetail(res.data);
+        } catch (err) {
+            setError(err.response?.data?.message || 'Failed to load acknowledgement details');
+        } finally {
+            setDetailLoading(false);
+        }
+    };
+
     const updateInvoice = (idx, patch) => setInvoices(list => list.map((inv, i) => i === idx ? { ...inv, ...patch } : inv));
     const setStatus = (idx, status) => {
         const ifa = Number(invoices[idx]?.ifa_amount || 0);
@@ -43,10 +97,11 @@ const Acknowledgement = () => {
         updateInvoice(idx, { status, returned_amount });
     };
     const onSelectVoucher = async (id) => {
+        if (modalMode !== 'add') return;
         setVoucherId(id);
         setError('');
         setSuccess('');
-        setRunMetrics({ last_odometer: '', current_odometer: '' });
+        setRunMetrics(emptyRunMetrics);
         const v = advances.find(a => String(a.id) === String(id));
         setVoucherInfo(v || null);
         if (!id) return setInvoices([]);
@@ -56,6 +111,7 @@ const Acknowledgement = () => {
                 const systemDate = getSystemDate();
                 setInvoices(res.data.map(inv => ({
                     ...inv,
+                    loading_advance_invoice_id: inv.id,
                     status: 'Pending',
                     returned_amount: 0,
                     acknowledgement_number: buildAcknowledgementNumber(inv.invoice_number),
@@ -93,19 +149,22 @@ const Acknowledgement = () => {
         try {
             setSubmitting(true);
             const payload = {
-                loading_advance_id: voucherInfo.id,
+                loading_advance_id: voucherInfo.loading_advance_id || voucherInfo.id,
                 last_odometer: hasLastOdometer ? parsedLastOdometer : null,
                 current_odometer: hasCurrentOdometer ? parsedCurrentOdometer : null,
-                items: invoices.map(i => ({ loading_advance_invoice_id: i.id, status: i.status, returned_amount: i.returned_amount }))
+                items: invoices.map(i => ({
+                    loading_advance_invoice_id: i.loading_advance_invoice_id || i.id,
+                    status: i.status,
+                    returned_amount: i.returned_amount
+                }))
             };
-            const res = await acknowledgementAPI.create(payload);
+            const res = modalMode === 'edit'
+                ? await acknowledgementAPI.update(editingAckId, payload)
+                : await acknowledgementAPI.create(payload);
             if (res.success) {
-                setSuccess('Acknowledgement saved');
+                setSuccess(`Acknowledgement ${modalMode === 'edit' ? 'updated' : 'saved'}`);
                 setModalOpen(false);
-                setVoucherId('');
-                setVoucherInfo(null);
-                setInvoices([]);
-                setRunMetrics({ last_odometer: '', current_odometer: '' });
+                resetForm();
                 setRefreshKey(k => k + 1);
             }
         } catch (err) { setError(err.response?.data?.message || 'Save failed'); }
@@ -115,16 +174,19 @@ const Acknowledgement = () => {
     if (loading) return (<div className="flex flex-col items-center justify-center min-h-[300px] text-slate-500"><Loader2 className="h-10 w-10 animate-spin text-blue-600 mb-3" /><p className="text-base font-medium">Loading vouchers...</p></div>);
     return (
         <div className="space-y-6">
-            <div className="flex justify-end"><Button onClick={() => { setModalOpen(true); setError(''); setSuccess(''); setRunMetrics({ last_odometer: '', current_odometer: '' }); }} className="bg-blue-600 hover:bg-blue-700">Add Acknowledgement</Button></div>
-            <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+            <div className="flex justify-end"><Button onClick={openAddModal} className="bg-blue-600 hover:bg-blue-700">Add Acknowledgement</Button></div>
+            <Dialog open={modalOpen} onOpenChange={(open) => { setModalOpen(open); if (!open) resetForm(); }}>
                 <DialogContent className="max-w-5xl">
-                    <DialogHeader><DialogTitle>Acknowledgement</DialogTitle></DialogHeader>
+                    <DialogHeader><DialogTitle>{modalMode === 'edit' ? 'Edit Acknowledgement' : 'Acknowledgement'}</DialogTitle></DialogHeader>
                     {error && <div className="p-3 bg-red-50 text-red-600 rounded-md text-sm">{error}</div>}
                     {success && <div className="p-3 bg-green-50 text-green-600 rounded-md text-sm">{success}</div>}
+                    {detailLoading ? (
+                        <div className="flex items-center justify-center gap-2 py-10 text-slate-500"><Loader2 className="h-5 w-5 animate-spin text-blue-600" /> Loading acknowledgement...</div>
+                    ) : (
                     <form onSubmit={handleSubmit} className="space-y-4 max-h-[80vh] overflow-y-auto pr-1">
                         <Card className="border border-slate-100 shadow-none"><CardHeader className="pb-2 bg-accent/10 border-b border-accent/20 rounded-t-lg"><CardTitle className="text-lg text-accent">Voucher & Vehicle Information</CardTitle></CardHeader>
                             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-1"><Label className="required">Voucher Number</Label><Select value={voucherId} onValueChange={onSelectVoucher}><SelectTrigger><SelectValue placeholder="Select voucher" /></SelectTrigger><SelectContent>{advances.map(v => <SelectItem key={v.id} value={String(v.id)}>{v.voucher_number}</SelectItem>)}</SelectContent></Select></div>
+                                <div className="space-y-1"><Label className="required">Voucher Number</Label><Select value={voucherId} onValueChange={onSelectVoucher} disabled={modalMode === 'edit'}><SelectTrigger><SelectValue placeholder="Select voucher" /></SelectTrigger><SelectContent>{advances.map(v => <SelectItem key={v.id} value={String(v.id)}>{v.voucher_number}</SelectItem>)}</SelectContent></Select></div>
                                 <div className="space-y-1"><Label>Voucher Date</Label><Input disabled value={voucherInfo?.voucher_datetime ? new Date(voucherInfo.voucher_datetime).toLocaleString() : ''} /></div>
                                 <div className="space-y-1"><Label>Vehicle Number</Label><Input disabled value={voucherInfo?.vehicle_registration_number || ''} /></div>
                                 <div className="space-y-1"><Label>Invoice Date</Label><Input disabled value={voucherInfo?.invoice_date || ''} /></div>
@@ -155,7 +217,7 @@ const Acknowledgement = () => {
                                                 </TableRow>
                                             )}
                                             {invoices.map((inv, i) => (
-                                                <TableRow key={inv.id}>
+                                                <TableRow key={inv.loading_advance_invoice_id || inv.id}>
                                                     <TableCell>{inv.invoice_number}</TableCell>
                                                     <TableCell>{inv.dealer_name || '-'}</TableCell>
                                                     <TableCell>{Number(inv.quantity || 0).toFixed(3)}</TableCell>
@@ -209,11 +271,12 @@ const Acknowledgement = () => {
                                 </div>
                             </CardContent>
                         </Card>
-                        <div className="flex justify-end gap-2 pt-2"><Button type="button" variant="outline" onClick={() => { setVoucherId(''); setVoucherInfo(null); setInvoices([]); setRunMetrics({ last_odometer: '', current_odometer: '' }); }} disabled={submitting}>Clear</Button><Button type="submit" disabled={submitting || !voucherId}>{submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Save</Button></div>
+                        <div className="flex justify-end gap-2 pt-2"><Button type="button" variant="outline" onClick={resetForm} disabled={submitting || modalMode === 'edit'}>Clear</Button><Button type="submit" disabled={submitting || !voucherId}>{submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}{modalMode === 'edit' ? 'Update' : 'Save'}</Button></div>
                     </form>
+                    )}
                 </DialogContent>
             </Dialog>
-            <AcknowledgementTable refreshKey={refreshKey} />
+            <AcknowledgementTable refreshKey={refreshKey} onEdit={openEditModal} />
         </div>
     );
 };

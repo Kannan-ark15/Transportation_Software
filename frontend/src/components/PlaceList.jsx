@@ -4,7 +4,6 @@ import { placeAPI, companyAPI, productAPI } from '../services/api';
 import Pagination from './Pagination';
 import {
     Plus,
-    Search,
     Eye,
     Edit,
     Trash2,
@@ -58,7 +57,9 @@ const PlaceList = () => {
 
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
-
+    const [searchFromPlace, setSearchFromPlace] = useState('');
+    const [searchDistrict, setSearchDistrict] = useState('');
+    const [searchProduct, setSearchProduct] = useState('');
     const [modalOpen, setModalOpen] = useState(false);
     const [modalMode, setModalMode] = useState('add');
     const [selectedPlace, setSelectedPlace] = useState(null);
@@ -375,9 +376,15 @@ const PlaceList = () => {
         } catch (err) { setError('Failed to delete route'); }
     };
 
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const paginatedItems = places.slice(startIndex, startIndex + itemsPerPage);
+    const filteredPlaces = places.filter(p => {
+        const fromPlaceMatch = !searchFromPlace || (p.from_place || '').toLowerCase().includes(searchFromPlace.toLowerCase());
+        const districtMatch = !searchDistrict || (p.district || '').toLowerCase().includes(searchDistrict.toLowerCase());
+        const productMatch = !searchProduct || String(p.product_id) === searchProduct;
+        return fromPlaceMatch && districtMatch && productMatch;
+    });
 
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const paginatedItems = filteredPlaces.slice(startIndex, startIndex + itemsPerPage);
     if (loading) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[400px] text-slate-500">
@@ -417,6 +424,54 @@ const PlaceList = () => {
                 </CardHeader>
 
                 <CardContent className="pt-6">
+                    <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-3">
+                        <div className="relative">
+                            <Navigation className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                            <Input
+                                placeholder="Search by From Place..."
+                                value={searchFromPlace}
+                                onChange={e => {
+                                    setSearchFromPlace(e.target.value);
+                                    setCurrentPage(1);
+                                }}
+                                className="pl-9"
+                            />
+                        </div>
+                        <div className="relative">
+                            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                            <Input
+                                placeholder="Search by District..."
+                                value={searchDistrict}
+                                onChange={e => {
+                                    setSearchDistrict(e.target.value);
+                                    setCurrentPage(1);
+                                }}
+                                className="pl-9"
+                            />
+                        </div>
+                        <div className="relative">
+                            <Package className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                            <Select
+                                value={searchProduct}
+                                onValueChange={val => {
+                                    setSearchProduct(val === 'all' ? '' : val);
+                                    setCurrentPage(1);
+                                }}
+                            >
+                                <SelectTrigger className="pl-9">
+                                    <SelectValue placeholder="Search by Product..." />
+                                </SelectTrigger>
+                                <SelectContent searchPlaceholder="Search product...">
+                                    <SelectItem value="all">All Products</SelectItem>
+                                    {products.map(product => (
+                                        <SelectItem key={product.id} value={product.id.toString()}>
+                                            {product.product_name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
                     {error && (
                         <div className="mb-4 p-4 bg-red-50 border border-red-100 text-red-600 rounded-lg text-sm font-medium">
                             {error}
@@ -428,7 +483,7 @@ const PlaceList = () => {
                         </div>
                     )}
 
-                    {places.length === 0 ? (
+                    {filteredPlaces.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-12 text-slate-400">
                             <div className="bg-slate-50 p-6 rounded-full mb-4">
                                 <SearchX className="w-12 h-12 text-slate-300" />
@@ -520,7 +575,7 @@ const PlaceList = () => {
                             <div className="mt-4">
                                 <Pagination
                                     currentPage={currentPage}
-                                    totalItems={places.length}
+                                    totalItems={filteredPlaces.length}
                                     itemsPerPage={itemsPerPage}
                                     onPageChange={setCurrentPage}
                                     onItemsPerPageChange={setItemsPerPage}
