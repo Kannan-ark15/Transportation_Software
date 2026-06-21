@@ -334,14 +334,16 @@ const createSettlement = async (req, res, next) => {
             const fuelAmount = toNumber(voucher.fuel_amount);
             const driverLoadingAdvance = toNumber(voucher.driver_loading_advance);
 
-            const totalExpenses = unloading
+            const totalExpenses = driverBata
+                + unloading
                 + tarpaulin
                 + cityTax
                 + maintenance
                 + meta.parking_charges
                 + meta.expenditure_1
                 + meta.expenditure_2
-                + meta.expenditure_3;
+                + meta.expenditure_3
+                + meta.deduction;
 
             const driverBalance = Number((driverLoadingAdvance - totalExpenses).toFixed(2));
 

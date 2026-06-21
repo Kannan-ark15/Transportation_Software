@@ -158,7 +158,7 @@ const getOwnerForGstHeader = async (client) => {
     return ownerRes.rows[0] || null;
 };
 
-const getInvoicePeriodTotals = async (client, fromDate, toDate, productNames = []) => {
+const getInvoicePeriodTotals = async (client, fromDate, toDate, productNames = [], companyId = null) => {
     const values = [fromDate, toDate];
     let productFilterClause = '';
 
@@ -170,6 +170,9 @@ const getInvoicePeriodTotals = async (client, fromDate, toDate, productNames = [
         productFilterClause = ` AND LOWER(TRIM(COALESCE(la.product_name, ''))) = ANY($${values.length}::TEXT[])`;
     }
 
+    values.push(companyId);
+    const companyIdIdx = values.length;
+
     const totalsRes = await client.query(
         `SELECT
             COALESCE(NULLIF(TRIM(la.product_name), ''), 'Unknown') AS product_name,
@@ -177,8 +180,11 @@ const getInvoicePeriodTotals = async (client, fromDate, toDate, productNames = [
             COALESCE(SUM(lai.quantity * (lai.kt_freight + 1)), 0)::DECIMAL(12, 2) AS amount_freight
          FROM loading_advance_invoices lai
          JOIN loading_advances la ON la.id = lai.loading_advance_id
-         JOIN acknowledgements a ON a.loading_advance_id = la.id
+         JOIN products pr ON LOWER(TRIM(pr.product_name)) = LOWER(TRIM(la.product_name))
+         JOIN places p ON LOWER(TRIM(p.to_place)) = LOWER(TRIM(lai.to_place)) AND p.product_id = pr.id
+         JOIN dealers d ON d.place_id = p.id AND LOWER(TRIM(d.dealer_name)) = LOWER(TRIM(lai.dealer_name))
          WHERE la.invoice_date BETWEEN $1 AND $2${productFilterClause}
+           AND ($${companyIdIdx}::INT IS NULL OR p.company_id = $${companyIdIdx}::INT)
          GROUP BY COALESCE(NULLIF(TRIM(la.product_name), ''), 'Unknown')
          ORDER BY product_name ASC`,
         values
@@ -290,6 +296,7 @@ const getGstInvoicePeriodSummary = async (req, res, next) => {
     try {
         const fromDate = normalizeText(req.query?.from_date);
         const toDate = normalizeText(req.query?.to_date);
+        const consigneeCompanyId = Number(req.query?.consignee_company_id) || null;
 
         if (!fromDate || !isValidDateString(fromDate)) {
             return res.status(400).json({ success: false, message: 'Valid from_date is required' });
@@ -310,7 +317,7 @@ const getGstInvoicePeriodSummary = async (req, res, next) => {
         const selectedProducts = await fetchProductsByIds(client, selectedProductIds);
         const selectedProductNames = selectedProducts.map((product) => product.product_name);
 
-        const periodTotals = await getInvoicePeriodTotals(client, fromDate, toDate, selectedProductNames);
+        const periodTotals = await getInvoicePeriodTotals(client, fromDate, toDate, selectedProductNames, consigneeCompanyId);
 
         res.status(200).json({
             success: true,
@@ -466,7 +473,7 @@ const createGstInvoice = async (req, res, next) => {
         const selectedProducts = await fetchProductsByIds(client, selectedProductIds);
         const selectedProductNames = selectedProducts.map((product) => product.product_name);
 
-        const periodTotals = await getInvoicePeriodTotals(client, fromDate, toDate, selectedProductNames);
+        const periodTotals = await getInvoicePeriodTotals(client, fromDate, toDate, selectedProductNames, consigneeCompanyId);
 
         const amountFreight = round2(periodTotals.amount_freight);
         const quantityMt = round3(periodTotals.quantity_mt);

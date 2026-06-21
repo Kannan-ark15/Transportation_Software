@@ -159,9 +159,10 @@ const GstInvoices = () => {
     useEffect(() => {
         const hasDates = Boolean(formData.from_date && formData.to_date);
         const hasProducts = Array.isArray(formData.selected_product_ids) && formData.selected_product_ids.length > 0;
+        const hasCompany = Boolean(formData.consignee_company_id);
         const invalidDateRange = hasDates && formData.to_date < formData.from_date;
 
-        if (!hasDates || !hasProducts || invalidDateRange) {
+        if (!hasDates || !hasProducts || !hasCompany || invalidDateRange) {
             setPeriodSummary(null);
             setSummaryError('');
             setSummaryLoading(false);
@@ -176,7 +177,8 @@ const GstInvoices = () => {
                 const res = await gstInvoiceAPI.getPeriodSummary({
                     from_date: formData.from_date,
                     to_date: formData.to_date,
-                    product_ids: formData.selected_product_ids
+                    product_ids: formData.selected_product_ids,
+                    consignee_company_id: formData.consignee_company_id
                 });
                 if (!cancelled && res.success) {
                     setPeriodSummary(res.data);
@@ -197,7 +199,7 @@ const GstInvoices = () => {
         return () => {
             cancelled = true;
         };
-    }, [formData.from_date, formData.to_date, selectedProductsKey]);
+    }, [formData.from_date, formData.to_date, selectedProductsKey, formData.consignee_company_id]);
 
     const selectedConsignee = useMemo(
         () => companies.find((company) => String(company.id) === String(formData.consignee_company_id)),

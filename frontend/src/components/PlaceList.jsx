@@ -57,7 +57,7 @@ const PlaceList = () => {
 
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
-    const [searchFromPlace, setSearchFromPlace] = useState('');
+    const [searchToPlace, setSearchToPlace] = useState('');
     const [searchDistrict, setSearchDistrict] = useState('');
     const [searchProduct, setSearchProduct] = useState('');
     const [modalOpen, setModalOpen] = useState(false);
@@ -300,7 +300,7 @@ const PlaceList = () => {
             const updated = { ...row, [field]: value };
             if (field === 'rcl_freight') {
                 const parsed = parseFloat(value);
-                updated.kt_freight = Number.isFinite(parsed) ? (Math.floor(parsed) - 1).toString() : '';
+                updated.kt_freight = Number.isFinite(parsed) ? (parsed - 1).toString() : '';
             }
             return updated;
         }));
@@ -331,7 +331,7 @@ const PlaceList = () => {
                 const rcl = parseFloat(row.rcl_freight);
                 const kt = row.kt_freight !== '' && row.kt_freight !== null && row.kt_freight !== undefined
                     ? row.kt_freight
-                    : (Number.isFinite(rcl) ? Math.floor(rcl) - 1 : '');
+                    : (Number.isFinite(rcl) ? (rcl - 1).toString() : '');
                 const isOpenContainer = String(row.vehicle_body_type || '').toLowerCase() === 'open container';
                 return {
                     ...row,
@@ -377,10 +377,10 @@ const PlaceList = () => {
     };
 
     const filteredPlaces = places.filter(p => {
-        const fromPlaceMatch = !searchFromPlace || (p.from_place || '').toLowerCase().includes(searchFromPlace.toLowerCase());
+        const toPlaceMatch = !searchToPlace || (p.to_place || '').toLowerCase().includes(searchToPlace.toLowerCase());
         const districtMatch = !searchDistrict || (p.district || '').toLowerCase().includes(searchDistrict.toLowerCase());
         const productMatch = !searchProduct || String(p.product_id) === searchProduct;
-        return fromPlaceMatch && districtMatch && productMatch;
+        return toPlaceMatch && districtMatch && productMatch;
     });
 
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -428,10 +428,10 @@ const PlaceList = () => {
                         <div className="relative">
                             <Navigation className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                             <Input
-                                placeholder="Search by From Place..."
-                                value={searchFromPlace}
+                                placeholder="Search by To Place..."
+                                value={searchToPlace}
                                 onChange={e => {
-                                    setSearchFromPlace(e.target.value);
+                                    setSearchToPlace(e.target.value);
                                     setCurrentPage(1);
                                 }}
                                 className="pl-9"
@@ -762,6 +762,7 @@ const PlaceList = () => {
                                                         <td className="px-3 py-2">
                                                             <Input
                                                                 type="number"
+                                                                step="0.01"
                                                                 value={row.rcl_freight}
                                                                 disabled={modalMode === 'view'}
                                                                 onChange={(e) => handleRateRowChange(index, 'rcl_freight', e.target.value)}
@@ -773,6 +774,7 @@ const PlaceList = () => {
                                                         <td className="px-3 py-2">
                                                             <Input
                                                                 type="number"
+                                                                step="0.01"
                                                                 value={row.kt_freight}
                                                                 disabled={modalMode === 'view'}
                                                                 onChange={(e) => handleRateRowChange(index, 'kt_freight', e.target.value)}
