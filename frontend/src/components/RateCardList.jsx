@@ -90,7 +90,7 @@ const RateCardList = () => {
     useEffect(() => {
         const rcl = parseFloat(formData.rcl_freight) || 0;
         if (rcl > 0) {
-            const kt = Math.floor(rcl) - 1;
+            const kt = Number((rcl - 1).toFixed(2));
             setFormData(prev => ({ ...prev, kt_freight: kt.toString() }));
         } else {
             setFormData(prev => ({ ...prev, kt_freight: '' }));
@@ -132,7 +132,8 @@ const RateCardList = () => {
 
                 // Auto-calc KT if missing
                 if (!mappedData.kt_freight) {
-                    mappedData.kt_freight = (Math.floor(parseFloat(mappedData.rcl_freight)) - 1).toString();
+                    const parsedRcl = parseFloat(mappedData.rcl_freight);
+                    mappedData.kt_freight = Number.isFinite(parsedRcl) ? Number((parsedRcl - 1).toFixed(2)).toString() : '';
                 }
 
                 try {
@@ -324,17 +325,17 @@ const RateCardList = () => {
                                                 </TableCell>
                                                 <TableCell>
                                                     <div className="flex items-center gap-1 font-semibold text-slate-900">
-                                                        <IndianRupee className="w-3 h-3 text-slate-400" /> {parseFloat(r.rcl_freight).toLocaleString()}
+                                                        <IndianRupee className="w-3 h-3 text-slate-400" /> {Number(r.rcl_freight || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                     </div>
                                                 </TableCell>
                                                 <TableCell>
                                                     <div className="flex items-center gap-1 font-semibold text-blue-600">
-                                                        <IndianRupee className="w-3 h-3 text-blue-400" /> {parseFloat(r.kt_freight).toLocaleString()}
+                                                        <IndianRupee className="w-3 h-3 text-blue-400" /> {Number(r.kt_freight || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                     </div>
                                                 </TableCell>
                                                 <TableCell>
-                                                    <div className="text-xs text-slate-600">B: ₹{r.driver_bata || 0}</div>
-                                                    <div className="text-xs text-slate-600">A: ₹{r.advance || 0}</div>
+                                                    <div className="text-xs text-slate-600">B: Ã¢â€šÂ¹{r.driver_bata || 0}</div>
+                                                    <div className="text-xs text-slate-600">A: Ã¢â€šÂ¹{r.advance || 0}</div>
                                                 </TableCell>
                                                 <TableCell className="text-right">
                                                     <div className="flex justify-end gap-1">
@@ -436,10 +437,11 @@ const RateCardList = () => {
                             </h4>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-slate-50/50 rounded-xl border border-slate-100">
                                 <div className="space-y-2 text-center md:text-left">
-                                    <Label htmlFor="rcl_freight" className="required text-base font-bold text-slate-700">RCL Freight (₹)</Label>
+                                    <Label htmlFor="rcl_freight" className="required text-base font-bold text-slate-700">RCL Freight (Ã¢â€šÂ¹)</Label>
                                     <Input
                                         id="rcl_freight"
-                                        type="number"
+                                        type="number"
+                                        step="0.01"
                                         value={formData.rcl_freight}
                                         onChange={e => setFormData({ ...formData, rcl_freight: e.target.value })}
                                         placeholder="Enter manual rate"
@@ -452,7 +454,7 @@ const RateCardList = () => {
                                         <ArrowRightLeft className="w-3 h-3" /> KT Freight (AUTO)
                                     </div>
                                     <span className="text-2xl font-black text-white">
-                                        {formData.kt_freight ? `₹${formData.kt_freight}` : '--'}
+                                        {formData.kt_freight ? `Ã¢â€šÂ¹${formData.kt_freight}` : '--'}
                                     </span>
                                     <span className="text-[9px] text-blue-200 mt-1 opacity-75">Calculation: Floor(RCL) - 1</span>
                                 </div>
@@ -530,3 +532,5 @@ const RateCardList = () => {
 };
 
 export default RateCardList;
+
+

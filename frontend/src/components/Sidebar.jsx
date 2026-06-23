@@ -12,6 +12,7 @@ import {
     BarChart3,
     Truck,
     ReceiptText,
+    Fuel,
     LogOut
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -174,6 +175,19 @@ const Sidebar = () => {
                 { label: 'Purchase GST (Input)', path: '/gst/purchase-tracker' },
                 { label: 'ITC Ledger (Import)', path: '/gst/itc-ledger' },
                 { label: 'GST Filing', path: '/gst/filing' }
+            ]
+        },
+        {
+            id: 'station',
+            label: 'Station',
+            icon: <Fuel className="w-5 h-5" />,
+            hasSubmenu: true,
+            submenu: [
+                { label: 'Product Set-up', path: '/station/products' },
+                { label: 'Tank Set-up', path: '/station/tanks' },
+                { label: 'Dispenser Set-up', path: '/station/dispensers' },
+                { label: 'Nozzle Set-up', path: '/station/nozzles' },
+                { label: 'Rate Set-up', path: '/station/rates' }
             ]
         },
         {
@@ -342,3 +356,4 @@ const Sidebar = () => {
 };
 
 export default Sidebar;
+

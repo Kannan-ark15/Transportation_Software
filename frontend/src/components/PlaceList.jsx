@@ -300,7 +300,7 @@ const PlaceList = () => {
             const updated = { ...row, [field]: value };
             if (field === 'rcl_freight') {
                 const parsed = parseFloat(value);
-                updated.kt_freight = Number.isFinite(parsed) ? (parsed - 1).toString() : '';
+                updated.kt_freight = Number.isFinite(parsed) ? Number((parsed - 1).toFixed(2)).toString() : '';
             }
             return updated;
         }));
@@ -331,7 +331,7 @@ const PlaceList = () => {
                 const rcl = parseFloat(row.rcl_freight);
                 const kt = row.kt_freight !== '' && row.kt_freight !== null && row.kt_freight !== undefined
                     ? row.kt_freight
-                    : (Number.isFinite(rcl) ? (rcl - 1).toString() : '');
+                    : (Number.isFinite(rcl) ? Number((rcl - 1).toFixed(2)).toString() : '');
                 const isOpenContainer = String(row.vehicle_body_type || '').toLowerCase() === 'open container';
                 return {
                     ...row,
@@ -502,7 +502,7 @@ const PlaceList = () => {
                                         <TableRow>
                                             <TableHead className="w-[80px] font-bold text-slate-700">S.No</TableHead>
                                             <TableHead className="font-bold text-slate-700">Company</TableHead>
-                                            <TableHead className="font-bold text-slate-700">Route Map (From → To)</TableHead>
+                                            <TableHead className="font-bold text-slate-700">Route Map (From â†’ To)</TableHead>
                                             <TableHead className="font-bold text-slate-700">Distance</TableHead>
                                             <TableHead className="font-bold text-slate-700">Product</TableHead>
                                             <TableHead className="text-right font-bold text-slate-700">Actions</TableHead>
@@ -859,7 +859,7 @@ const PlaceList = () => {
                                                                 <Trash2 className="h-4 w-4" />
                                                             </Button>
                                                         ) : (
-                                                            <span className="text-slate-300">—</span>
+                                                            <span className="text-slate-300">â€”</span>
                                                         )}
                                                     </td>
                                                 </tr>
@@ -928,3 +928,4 @@ const PlaceList = () => {
 };
 
 export default PlaceList;
+

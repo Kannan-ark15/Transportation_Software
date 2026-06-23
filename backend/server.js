@@ -27,6 +27,7 @@ const itcLedgerRoutes = require('./routes/itcLedgerRoutes');
 const gstFilingRoutes = require('./routes/gstFilingRoutes');
 const templateRoutes = require('./routes/templateRoutes');
 const authRoutes = require('./routes/authRoutes');
+const stationRoutes = require('./routes/stationRoutes');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
 
 const app = express();
@@ -81,6 +82,7 @@ app.use('/api/itc-ledger', itcLedgerRoutes);
 app.use('/api/gst-filing', gstFilingRoutes);
 app.use('/api/templates', templateRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/station', stationRoutes);
 
 // 404 handler
 app.use(notFound);
@@ -96,3 +98,4 @@ app.listen(PORT, () => {
 });
 
 module.exports = app;
+

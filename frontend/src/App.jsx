@@ -29,6 +29,7 @@ import GstInvoices from './components/GstInvoices';
 import PurchaseGstTracker from './components/PurchaseGstTracker';
 import ItcLedger from './components/ItcLedger';
 import GstFiling from './components/GstFiling';
+import StationModule from './components/StationModule';
 import GlobalDialogProvider from './components/common/GlobalDialogProvider';
 
 function App() {
@@ -81,6 +82,7 @@ function App() {
                             <Route path="/gst/purchase-tracker" element={<PurchaseGstTracker />} />
                             <Route path="/gst/itc-ledger" element={<ItcLedger />} />
                             <Route path="/gst/filing" element={<GstFiling />} />
+                            <Route path="/station/:tab?" element={<StationModule />} />
                             <Route path="/templates" element={<TemplatesPage />} />
                         </Route>
                         <Route path="*" element={<Navigate to="/" replace />} />
@@ -92,3 +94,4 @@ function App() {
 }
 
 export default App;
+

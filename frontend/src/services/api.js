@@ -228,4 +228,25 @@ export const templatesAPI = {
     },
 };
 
+
+const generateStationCRUD = (entity) => ({
+    ...generateCRUD(`/station/${entity}`),
+    updateStatus: async (id, status) => {
+        const response = await api.patch(`/station/${entity}/${id}/status`, { status });
+        return response.data;
+    },
+});
+
+export const stationAPI = {
+    products: generateStationCRUD('products'),
+    tanks: generateStationCRUD('tanks'),
+    dispensers: generateStationCRUD('dispensers'),
+    nozzles: generateStationCRUD('nozzles'),
+    rates: generateCRUD('/station/rates'),
+    getActiveRates: async (date) => {
+        const response = await api.get('/station/rates/active', { params: { date } });
+        return response.data;
+    },
+};
 export default api;
+

@@ -18,7 +18,7 @@ class PlaceModel {
         const rclFreight = hasRcl ? toNumber(rateCard.rcl_freight) : 0;
         const ktFreight = hasValue(rateCard.kt_freight)
             ? toNumber(rateCard.kt_freight)
-            : (hasRcl && Number.isFinite(rclFreight) ? Math.floor(rclFreight) - 1 : 0);
+            : (hasRcl && Number.isFinite(rclFreight) ? Number((rclFreight - 1).toFixed(2)) : 0);
         const isOpenContainer = String(rateCard.vehicle_body_type || '').trim().toLowerCase() === 'open container';
         const tarpaulin = isOpenContainer ? (toNumberOrNull(rateCard.tarpaulin) ?? 0) : null;
 
@@ -284,3 +284,4 @@ class PlaceModel {
 }
 
 module.exports = PlaceModel;
+
