@@ -32,7 +32,9 @@ const Acknowledgement = () => {
     const totalIfa = useMemo(() => invoices.reduce((s, i) => s + (Number(i.ifa_amount) || 0), 0), [invoices]);
     const totalReturned = useMemo(() => invoices.reduce((s, i) => s + (Number(i.returned_amount) || 0), 0), [invoices]);
     const pendingAmount = (totalIfa - totalReturned);
-    const voucherStatus = invoices.length && invoices.every(i => i.status === 'Acknowledged') ? 'Ready for Settlement' : 'Pending';
+    const voucherStatus = invoices.length && invoices.every(i => i.status !== 'Pending') && pendingAmount > 0
+        ? 'Ready for Settlement'
+        : 'Pending';
     const fuelLitre = Number(voucherInfo?.fuel_litre || 0);
     const hasLastOdometer = !isBlank(runMetrics.last_odometer);
     const hasCurrentOdometer = !isBlank(runMetrics.current_odometer);

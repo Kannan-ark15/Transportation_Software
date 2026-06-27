@@ -141,6 +141,7 @@ const getReadyVouchers = async (req, res, next) => {
              JOIN loading_advances la ON la.id = a.loading_advance_id
              LEFT JOIN own_vehicle_settlement_vouchers ovsv ON ovsv.loading_advance_id = la.id
              WHERE a.voucher_status = $1
+               AND COALESCE(a.voucher_pending_amount, 0) > 0
                AND LOWER(TRIM(COALESCE(la.owner_type, ''))) = 'own'
                AND ovsv.id IS NULL
                AND EXISTS (
@@ -286,6 +287,7 @@ const createSettlement = async (req, res, next) => {
              LEFT JOIN own_vehicle_settlement_vouchers ovsv ON ovsv.loading_advance_id = la.id
              WHERE a.id = ANY($1::INT[])
                AND a.voucher_status = $2
+               AND COALESCE(a.voucher_pending_amount, 0) > 0
                AND LOWER(TRIM(COALESCE(la.owner_type, ''))) = 'own'
                AND la.driver_name = $3
                AND ovsv.id IS NULL

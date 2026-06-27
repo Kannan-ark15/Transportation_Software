@@ -53,6 +53,7 @@ const getReadyVouchers = async (req, res, next) => {
              JOIN owners o ON o.owner_name = la.owner_name AND o.owner_type = la.owner_type
              LEFT JOIN dedicated_market_settlement_vouchers dmsv ON dmsv.loading_advance_id = la.id
              WHERE a.voucher_status = $1
+               AND COALESCE(a.voucher_pending_amount, 0) > 0
                AND la.owner_type IN ('Dedicated', 'Market')
                AND dmsv.id IS NULL
                AND ($2::INT IS NULL OR o.id = $2)
@@ -155,6 +156,7 @@ const createSettlement = async (req, res, next) => {
              LEFT JOIN dedicated_market_settlement_vouchers dmsv ON dmsv.loading_advance_id = la.id
              WHERE a.id = ANY($1::INT[])
                AND a.voucher_status = $2
+               AND COALESCE(a.voucher_pending_amount, 0) > 0
                AND o.id = $3
                AND dmsv.id IS NULL
              ORDER BY a.id`,
