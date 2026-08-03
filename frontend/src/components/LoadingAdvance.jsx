@@ -212,6 +212,7 @@ const LoadingAdvance = () => {
                                                 <div className={sectionPaneClassName}>
                                                     <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Loaded Details</p>
                                                     <div className="grid grid-cols-1 gap-2">
+                                                        <div className={fieldWrapClassName}><Label className={fieldLabelClassName}>KT Freight</Label><Input className={inputClassName} disabled value={isEmpty(inv.kt_freight) ? '' : Number(inv.kt_freight || 0).toFixed(2)} /></div>
                                                         <div className={fieldWrapClassName}><Label className={fieldLabelClassName}>IFA (Invoice Freight Amount)</Label><Input className={inputClassName} disabled value={((Number(inv.quantity) || 0) * (Number(inv.kt_freight) || 0)).toFixed(2)} /></div>
                                                     </div>
                                                 </div>
