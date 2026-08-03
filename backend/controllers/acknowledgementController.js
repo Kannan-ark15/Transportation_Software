@@ -124,11 +124,12 @@ const buildAcknowledgementRows = async (client, loadingAdvanceId, items, existin
     const totalReturned = rows.reduce((sum, row) => sum + (Number(row.returned_amount) || 0), 0);
     const voucherPendingAmount = Number((totalIfa - totalReturned).toFixed(2));
     if (voucherPendingAmount < 0) return { error: 'Total returned exceeds total IFA' };
+    const isVoucherAcknowledged = rows.every(row => row.status === 'Acknowledged');
 
     return {
         rows,
         voucherPendingAmount,
-        voucherStatus: voucherPendingAmount === 0 ? 'Pending' : 'Ready for Settlement'
+        voucherStatus: isVoucherAcknowledged ? 'Ready for Settlement' : 'Pending'
     };
 };
 
