@@ -1,7 +1,6 @@
 const pool = require('../config/database');
 
 const READY_STATUS = 'Ready for Settlement';
-const COMMISSION_PERCENT = 6;
 
 const toNumber = (value, fallback = 0) => {
     const parsed = Number(value);
@@ -39,6 +38,7 @@ const getReadyVouchers = async (req, res, next) => {
                     (SELECT SUM(lai.ifa_amount) FROM loading_advance_invoices lai WHERE lai.loading_advance_id = la.id),
                     0
                 )::DECIMAL(12,2) AS sum_ifas,
+                COALESCE(la.predefined_expenses, 0)::DECIMAL(12,2) AS total_deductions,
                 COALESCE(
                     (
                         SELECT string_agg(ai.invoice_number, ', ' ORDER BY ai.invoice_number)
@@ -147,7 +147,8 @@ const createSettlement = async (req, res, next) => {
                     la.sum_ifas,
                     (SELECT SUM(lai.ifa_amount) FROM loading_advance_invoices lai WHERE lai.loading_advance_id = la.id),
                     0
-                )::DECIMAL(12,2) AS sum_ifas
+                )::DECIMAL(12,2) AS sum_ifas,
+                COALESCE(la.predefined_expenses, 0)::DECIMAL(12,2) AS total_deductions
              FROM acknowledgements a
              JOIN loading_advances la ON la.id = a.loading_advance_id
              JOIN owners o ON o.owner_name = la.owner_name AND o.owner_type = la.owner_type
@@ -165,8 +166,16 @@ const createSettlement = async (req, res, next) => {
         }
 
         const sumIfas = Number(voucherRes.rows.reduce((sum, row) => sum + toNumber(row.sum_ifas), 0).toFixed(2));
-        const commissionAmount = Number(((sumIfas * COMMISSION_PERCENT) / 100).toFixed(2));
-        const settlementBalance = Number((sumIfas - commissionAmount).toFixed(2));
+        const totalDeductions = Number(voucherRes.rows.reduce((sum, row) => sum + toNumber(row.total_deductions), 0).toFixed(2));
+        if (totalDeductions < 0) {
+            return res.status(400).json({ success: false, message: 'Total deductions cannot be negative' });
+        }
+        if (totalDeductions > sumIfas) {
+            return res.status(400).json({ success: false, message: 'Total deductions cannot exceed sum of IFAs' });
+        }
+
+        const settlementBalance = Number((sumIfas - totalDeductions).toFixed(2));
+        const deductionPercent = sumIfas > 0 ? Number(((totalDeductions / sumIfas) * 100).toFixed(4)) : 0;
 
         await client.query('BEGIN');
         inTx = true;
@@ -187,8 +196,8 @@ const createSettlement = async (req, res, next) => {
                 effectiveAccountNo,
                 effectiveIfscCode,
                 sumIfas,
-                COMMISSION_PERCENT,
-                commissionAmount,
+                deductionPercent,
+                totalDeductions,
                 settlementBalance,
                 true
             ]
@@ -199,17 +208,11 @@ const createSettlement = async (req, res, next) => {
             (settlement_id, acknowledgement_id, loading_advance_id, vehicle_number, voucher_number, sum_ifas, commission_amount, final_balance)
             VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`;
 
-        let allocatedCommission = 0;
         let totalFinalBalance = 0;
-        for (const [index, voucher] of voucherRes.rows.entries()) {
+        for (const voucher of voucherRes.rows) {
             const voucherSumIfa = Number(toNumber(voucher.sum_ifas).toFixed(2));
-            const voucherCommission = index === voucherRes.rows.length - 1
-                ? Number((commissionAmount - allocatedCommission).toFixed(2))
-                : sumIfas > 0
-                    ? Number(((voucherSumIfa / sumIfas) * commissionAmount).toFixed(2))
-                    : 0;
-            allocatedCommission = Number((allocatedCommission + voucherCommission).toFixed(2));
-            const voucherFinal = Number((voucherSumIfa - voucherCommission).toFixed(2));
+            const voucherTotalDeductions = Number(toNumber(voucher.total_deductions).toFixed(2));
+            const voucherFinal = Number((voucherSumIfa - voucherTotalDeductions).toFixed(2));
             totalFinalBalance += voucherFinal;
             await client.query(voucherInsert, [
                 settlement.id,
@@ -218,7 +221,7 @@ const createSettlement = async (req, res, next) => {
                 voucher.vehicle_number,
                 voucher.voucher_number,
                 voucherSumIfa,
-                voucherCommission,
+                voucherTotalDeductions,
                 voucherFinal
             ]);
         }

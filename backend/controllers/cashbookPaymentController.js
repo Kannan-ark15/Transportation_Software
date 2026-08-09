@@ -37,11 +37,9 @@ const fetchReferenceInfo = async (client, referenceModule, referenceRecordId) =>
                     s.id,
                     s.driver_name,
                     s.driver_salary_payable,
-                    COALESCE(string_agg(DISTINCT sv.vehicle_number, ', ' ORDER BY sv.vehicle_number), '') AS vehicle_numbers,
-                    COALESCE(array_agg(DISTINCT v.id) FILTER (WHERE v.id IS NOT NULL), ARRAY[]::INTEGER[]) AS vehicle_ids
+                    COALESCE(string_agg(DISTINCT sv.vehicle_number, ', ' ORDER BY sv.vehicle_number), '') AS vehicle_numbers
                  FROM own_vehicle_settlements s
                  LEFT JOIN own_vehicle_settlement_vouchers sv ON sv.settlement_id = s.id
-                 LEFT JOIN vehicles v ON v.vehicle_no = sv.vehicle_number
                  WHERE s.id = $1
                  GROUP BY s.id`,
                 [referenceRecordId]
@@ -51,8 +49,7 @@ const fetchReferenceInfo = async (client, referenceModule, referenceRecordId) =>
             return {
                 amount: toNumber(row.driver_salary_payable, 0),
                 label: row.driver_name || null,
-                vehicle_numbers: row.vehicle_numbers || null,
-                vehicle_ids: row.vehicle_ids || []
+                vehicle_numbers: row.vehicle_numbers || null
             };
         }
         case 'Dedicated Owner Payable': {
@@ -210,11 +207,9 @@ const PAYMENT_SELECT = `
             s.id,
             s.driver_name,
             s.driver_salary_payable,
-            COALESCE(string_agg(DISTINCT sv.vehicle_number, ', ' ORDER BY sv.vehicle_number), '') AS vehicle_numbers,
-            COALESCE(array_agg(DISTINCT v.id) FILTER (WHERE v.id IS NOT NULL), ARRAY[]::INTEGER[]) AS vehicle_ids
+            COALESCE(string_agg(DISTINCT sv.vehicle_number, ', ' ORDER BY sv.vehicle_number), '') AS vehicle_numbers
         FROM own_vehicle_settlements s
         LEFT JOIN own_vehicle_settlement_vouchers sv ON sv.settlement_id = s.id
-        LEFT JOIN vehicles v ON v.vehicle_no = sv.vehicle_number
         GROUP BY s.id
     ) ovs ON p.reference_module = 'Driver Salary Payable' AND p.reference_record_id = ovs.id
     LEFT JOIN (
@@ -256,12 +251,9 @@ const getCashbookMeta = async (req, res, next) => {
                     s.driver_name,
                     s.driver_salary_payable,
                     s.created_at,
-                    COALESCE(string_agg(DISTINCT sv.vehicle_number, ', ' ORDER BY sv.vehicle_number), '') AS vehicle_numbers,
-                    COALESCE(array_agg(DISTINCT v.id) FILTER (WHERE v.id IS NOT NULL), ARRAY[]::INTEGER[]) AS vehicle_ids
+                    COALESCE(string_agg(DISTINCT sv.vehicle_number, ', ' ORDER BY sv.vehicle_number), '') AS vehicle_numbers
                  FROM own_vehicle_settlements s
                  LEFT JOIN own_vehicle_settlement_vouchers sv ON sv.settlement_id = s.id
-                 LEFT JOIN vehicles v ON v.vehicle_no = sv.vehicle_number
-                 WHERE s.driver_salary_payable > 0
                  GROUP BY s.id
                  ORDER BY s.created_at DESC`
             ),
@@ -401,10 +393,6 @@ const createPayment = async (req, res, next) => {
         if (reference_module === 'Due Settlement' && refInfo.due_settled) {
             return res.status(400).json({ success: false, message: 'Selected due settlement is already settled' });
         }
-        if (reference_module === 'Driver Salary Payable'
-            && (!refInfo.vehicle_ids.length || !refInfo.vehicle_ids.some(id => Number(id) === vehicleId))) {
-            return res.status(400).json({ success: false, message: 'Selected vehicle does not match the driver settlement' });
-        }
         if (refInfo.vehicle_id && Number(refInfo.vehicle_id) !== vehicleId) {
             return res.status(400).json({ success: false, message: 'Selected vehicle does not match the reference record' });
         }
@@ -538,10 +526,6 @@ const updatePayment = async (req, res, next) => {
         }
         if (reference_module === 'Due Settlement' && refInfo.due_settled && existingPayment.reference_record_id !== referenceId) {
             return res.status(400).json({ success: false, message: 'Selected due settlement is already settled' });
-        }
-        if (reference_module === 'Driver Salary Payable'
-            && (!refInfo.vehicle_ids.length || !refInfo.vehicle_ids.some(vehicleReferenceId => Number(vehicleReferenceId) === vehicleId))) {
-            return res.status(400).json({ success: false, message: 'Selected vehicle does not match the driver settlement' });
         }
         if (refInfo.vehicle_id && Number(refInfo.vehicle_id) !== vehicleId) {
             return res.status(400).json({ success: false, message: 'Selected vehicle does not match the reference record' });

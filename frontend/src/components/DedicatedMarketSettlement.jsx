@@ -10,7 +10,6 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Loader2, CircleDollarSign, SearchX, CheckCircle2 } from 'lucide-react';
 
-const COMMISSION_PERCENT = 6;
 const ALL_VEHICLES = '__ALL_VEHICLES__';
 
 const DedicatedMarketSettlement = () => {
@@ -61,14 +60,14 @@ const DedicatedMarketSettlement = () => {
         [selectedVouchers]
     );
 
-    const commissionAmount = useMemo(
-        () => Number(((sumIfas * COMMISSION_PERCENT) / 100).toFixed(2)),
-        [sumIfas]
+    const totalDeductions = useMemo(
+        () => Number(selectedVouchers.reduce((sum, row) => sum + (Number(row.total_deductions) || 0), 0).toFixed(2)),
+        [selectedVouchers]
     );
 
     const finalBalance = useMemo(
-        () => Number((sumIfas - commissionAmount).toFixed(2)),
-        [sumIfas, commissionAmount]
+        () => Number((sumIfas - totalDeductions).toFixed(2)),
+        [sumIfas, totalDeductions]
     );
 
     useEffect(() => {
@@ -157,6 +156,8 @@ const DedicatedMarketSettlement = () => {
         if (form.cash_bank === 'Bank' && (!form.bank_name || !form.branch || !form.account_no || !form.ifsc_code)) {
             return 'Bank details are required when Cash / Bank is Bank';
         }
+        if (totalDeductions < 0) return 'Total deductions cannot be negative';
+        if (totalDeductions > sumIfas) return 'Total deductions cannot exceed Sum of all IFAs';
         return '';
     };
 
@@ -178,6 +179,7 @@ const DedicatedMarketSettlement = () => {
                 branch: form.cash_bank === 'Bank' ? form.branch : null,
                 account_no: form.cash_bank === 'Bank' ? form.account_no : null,
                 ifsc_code: form.cash_bank === 'Bank' ? form.ifsc_code : null,
+                total_deductions: totalDeductions,
                 selected_vouchers: selectedVouchers.map(v => ({ acknowledgement_id: v.acknowledgement_id }))
             };
 
@@ -301,13 +303,14 @@ const DedicatedMarketSettlement = () => {
                                         <TableHead>Vehicle Number</TableHead>
                                         <TableHead>Voucher Number</TableHead>
                                         <TableHead>Sum of IFAs</TableHead>
+                                        <TableHead>Total Deductions</TableHead>
                                         <TableHead>Pending/Shortage Invoices</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {filteredReadyVouchers.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={5} className="text-center text-sm text-slate-400 py-6">
+                                            <TableCell colSpan={6} className="text-center text-sm text-slate-400 py-6">
                                                 No ready-for-settlement vouchers available for this owner.
                                             </TableCell>
                                         </TableRow>
@@ -324,6 +327,7 @@ const DedicatedMarketSettlement = () => {
                                                 <TableCell>{row.vehicle_number}</TableCell>
                                                 <TableCell className="font-medium">{row.voucher_number}</TableCell>
                                                 <TableCell>{Number(row.sum_ifas || 0).toFixed(2)}</TableCell>
+                                                <TableCell>{Number(row.total_deductions || 0).toFixed(2)}</TableCell>
                                                 <TableCell>{row.pending_shortage_invoice_numbers || '-'}</TableCell>
                                             </TableRow>
                                         ))
@@ -338,8 +342,8 @@ const DedicatedMarketSettlement = () => {
                                 <Input disabled value={sumIfas.toFixed(2)} />
                             </div>
                             <div className="space-y-1">
-                                <Label>Commission (6%)</Label>
-                                <Input disabled value={commissionAmount.toFixed(2)} />
+                                <Label>Total Deductions</Label>
+                                <Input disabled value={totalDeductions.toFixed(2)} />
                             </div>
                             <div className="space-y-1">
                                 <Label>Final Balance</Label>
@@ -393,7 +397,7 @@ const DedicatedMarketSettlement = () => {
                                         <TableHead>Vehicle Number</TableHead>
                                         <TableHead>Voucher Number</TableHead>
                                         <TableHead>Sum IFAs</TableHead>
-                                        <TableHead>Commission (6%)</TableHead>
+                                        <TableHead>Total Deductions</TableHead>
                                         <TableHead>Settlement Balance</TableHead>
                                         <TableHead>Settled Date</TableHead>
                                     </TableRow>
