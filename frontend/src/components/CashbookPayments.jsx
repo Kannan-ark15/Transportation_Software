@@ -155,11 +155,13 @@ const CashbookPayments = () => {
     const referenceOptions = useMemo(() => {
         let options = [];
         if (formData.reference_module === 'Driver Salary Payable') {
-            options = driverSalaryPayables.map((row) => ({
-                id: row.id,
-                amount: row.driver_salary_payable,
-                label: `Driver ${row.driver_name || 'NA'} | Vehicles: ${row.vehicle_numbers || 'NA'} | Amount ${formatMoney(row.driver_salary_payable)}`
-            }));
+            options = driverSalaryPayables
+                .filter((row) => !selectedVehicleId || (row.vehicle_ids || []).some((id) => String(id) === selectedVehicleId))
+                .map((row) => ({
+                    id: row.id,
+                    amount: row.driver_salary_payable,
+                    label: `Driver ${row.driver_name || 'NA'} | Vehicles: ${row.vehicle_numbers || 'NA'} | Amount ${formatMoney(row.driver_salary_payable)}`
+                }));
         } else if (formData.reference_module === 'Dedicated Owner Payable') {
             options = dedicatedOwnerPayables.map((row) => ({
                 id: row.id,
