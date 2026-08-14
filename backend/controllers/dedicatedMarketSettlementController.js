@@ -1,4 +1,5 @@
 const pool = require('../config/database');
+const { calculateDedicatedSettlement } = require('../utils/balanceSettlementCalculations');
 
 const READY_STATUS = 'Ready for Settlement';
 
@@ -37,23 +38,21 @@ const getReadyVouchers = async (req, res, next) => {
                     la.sum_ifas,
                     (SELECT SUM(lai.ifa_amount) FROM loading_advance_invoices lai WHERE lai.loading_advance_id = la.id),
                     0
-                )::DECIMAL(12,2) AS sum_ifas,
-                COALESCE(la.predefined_expenses, 0)::DECIMAL(12,2) AS total_deductions,
-                COALESCE(
-                    (
-                        SELECT string_agg(ai.invoice_number, ', ' ORDER BY ai.invoice_number)
-                        FROM acknowledgement_invoices ai
-                        WHERE ai.acknowledgement_id = a.id
-                            AND ai.status IN ('Pending', 'Shortage')
-                    ),
-                    ''
-                ) AS pending_shortage_invoice_numbers
+                 )::DECIMAL(12,2) AS sum_ifas
              FROM acknowledgements a
              JOIN loading_advances la ON la.id = a.loading_advance_id
-             JOIN owners o ON o.owner_name = la.owner_name AND o.owner_type = la.owner_type
+             JOIN owners o ON (
+                 o.id = la.owner_id
+                 OR (
+                     la.owner_id IS NULL
+                     AND o.owner_name = la.owner_name
+                     AND o.owner_type = la.owner_type
+                 )
+             )
              LEFT JOIN dedicated_market_settlement_vouchers dmsv ON dmsv.loading_advance_id = la.id
              WHERE a.voucher_status = $1
                AND la.owner_type IN ('Dedicated', 'Market')
+               AND o.status = 'Active'
                AND dmsv.id IS NULL
                AND ($2::INT IS NULL OR o.id = $2)
                AND ($3::TEXT IS NULL OR la.vehicle_registration_number = $3)
@@ -70,8 +69,9 @@ const getReadyVouchers = async (req, res, next) => {
 const getAllSettlements = async (req, res, next) => {
     try {
         const result = await pool.query(
-            `SELECT
+             `SELECT
                 s.*,
+                s.commission_amount AS total_deductions,
                 COALESCE(string_agg(DISTINCT sv.vehicle_number, ', ' ORDER BY sv.vehicle_number), '') AS vehicle_numbers,
                 COALESCE(string_agg(sv.voucher_number, ', ' ORDER BY sv.voucher_number), '') AS voucher_numbers
              FROM dedicated_market_settlements s
@@ -92,10 +92,8 @@ const createSettlement = async (req, res, next) => {
         const {
             owner_id,
             cash_bank,
-            bank_name,
-            branch,
-            account_no,
-            ifsc_code,
+            commission_amount,
+            vehicle_number,
             selected_vouchers = []
         } = req.body;
 
@@ -105,6 +103,9 @@ const createSettlement = async (req, res, next) => {
         if (!cash_bank || !['Cash', 'Bank'].includes(cash_bank)) {
             return res.status(400).json({ success: false, message: 'cash_bank must be Cash or Bank' });
         }
+        if (!vehicle_number || !String(vehicle_number).trim()) {
+            return res.status(400).json({ success: false, message: 'vehicle_number is required' });
+        }
         if (!Array.isArray(selected_vouchers) || selected_vouchers.length === 0) {
             return res.status(400).json({ success: false, message: 'At least one voucher must be selected' });
         }
@@ -113,7 +114,8 @@ const createSettlement = async (req, res, next) => {
             `SELECT id, owner_name, owner_type, bank_name, branch, account_no, ifsc_code
              FROM owners
              WHERE id = $1
-               AND owner_type IN ('Dedicated', 'Market')`,
+               AND owner_type IN ('Dedicated', 'Market')
+               AND status = 'Active'`,
             [owner_id]
         );
         if (ownerRes.rows.length === 0) {
@@ -121,10 +123,10 @@ const createSettlement = async (req, res, next) => {
         }
 
         const owner = ownerRes.rows[0];
-        const effectiveBankName = cash_bank === 'Bank' ? (bank_name || owner.bank_name || null) : null;
-        const effectiveBranch = cash_bank === 'Bank' ? (branch || owner.branch || null) : null;
-        const effectiveAccountNo = cash_bank === 'Bank' ? (account_no || owner.account_no || null) : null;
-        const effectiveIfscCode = cash_bank === 'Bank' ? (ifsc_code || owner.ifsc_code || null) : null;
+        const effectiveBankName = cash_bank === 'Bank' ? owner.bank_name || null : null;
+        const effectiveBranch = cash_bank === 'Bank' ? owner.branch || null : null;
+        const effectiveAccountNo = cash_bank === 'Bank' ? owner.account_no || null : null;
+        const effectiveIfscCode = cash_bank === 'Bank' ? owner.ifsc_code || null : null;
 
         if (cash_bank === 'Bank' && (!effectiveBankName || !effectiveBranch || !effectiveAccountNo || !effectiveIfscCode)) {
             return res.status(400).json({ success: false, message: 'Bank details are required when cash_bank is Bank' });
@@ -147,35 +149,48 @@ const createSettlement = async (req, res, next) => {
                     la.sum_ifas,
                     (SELECT SUM(lai.ifa_amount) FROM loading_advance_invoices lai WHERE lai.loading_advance_id = la.id),
                     0
-                )::DECIMAL(12,2) AS sum_ifas,
-                COALESCE(la.predefined_expenses, 0)::DECIMAL(12,2) AS total_deductions
+                )::DECIMAL(12,2) AS sum_ifas
              FROM acknowledgements a
              JOIN loading_advances la ON la.id = a.loading_advance_id
-             JOIN owners o ON o.owner_name = la.owner_name AND o.owner_type = la.owner_type
+             JOIN owners o ON (
+                 o.id = la.owner_id
+                 OR (
+                     la.owner_id IS NULL
+                     AND o.owner_name = la.owner_name
+                     AND o.owner_type = la.owner_type
+                 )
+             )
              LEFT JOIN dedicated_market_settlement_vouchers dmsv ON dmsv.loading_advance_id = la.id
              WHERE a.id = ANY($1::INT[])
                AND a.voucher_status = $2
                AND o.id = $3
+               AND la.vehicle_registration_number = $4
                AND dmsv.id IS NULL
              ORDER BY a.id`,
-            [ackIds, READY_STATUS, owner_id]
+            [ackIds, READY_STATUS, owner_id, String(vehicle_number).trim()]
         );
 
         if (voucherRes.rows.length !== ackIds.length) {
             return res.status(400).json({ success: false, message: 'One or more selected vouchers are not ready for settlement' });
         }
 
-        const sumIfas = Number(voucherRes.rows.reduce((sum, row) => sum + toNumber(row.sum_ifas), 0).toFixed(2));
-        const totalDeductions = Number(voucherRes.rows.reduce((sum, row) => sum + toNumber(row.total_deductions), 0).toFixed(2));
-        if (totalDeductions < 0) {
-            return res.status(400).json({ success: false, message: 'Total deductions cannot be negative' });
-        }
-        if (totalDeductions > sumIfas) {
-            return res.status(400).json({ success: false, message: 'Total deductions cannot exceed sum of IFAs' });
+        let calculated;
+        try {
+            calculated = calculateDedicatedSettlement({
+                sumIfas: voucherRes.rows.reduce((sum, row) => sum + toNumber(row.sum_ifas), 0),
+                commissionAmount: commission_amount
+            });
+        } catch (error) {
+            return res.status(400).json({ success: false, message: error.message });
         }
 
-        const settlementBalance = Number((sumIfas - totalDeductions).toFixed(2));
-        const deductionPercent = sumIfas > 0 ? Number(((totalDeductions / sumIfas) * 100).toFixed(4)) : 0;
+        const {
+            sumIfas,
+            commissionAmount: safeCommissionAmount,
+            totalDeductions,
+            settlementBalance,
+            commissionPercent
+        } = calculated;
 
         await client.query('BEGIN');
         inTx = true;
@@ -196,23 +211,32 @@ const createSettlement = async (req, res, next) => {
                 effectiveAccountNo,
                 effectiveIfscCode,
                 sumIfas,
-                deductionPercent,
-                totalDeductions,
+                commissionPercent,
+                safeCommissionAmount,
                 settlementBalance,
                 true
             ]
         );
 
         const settlement = settlementRes.rows[0];
+        settlement.total_deductions = totalDeductions;
         const voucherInsert = `INSERT INTO dedicated_market_settlement_vouchers
             (settlement_id, acknowledgement_id, loading_advance_id, vehicle_number, voucher_number, sum_ifas, commission_amount, final_balance)
             VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`;
 
+        let allocatedCommission = 0;
         let totalFinalBalance = 0;
-        for (const voucher of voucherRes.rows) {
+        for (const [index, voucher] of voucherRes.rows.entries()) {
             const voucherSumIfa = Number(toNumber(voucher.sum_ifas).toFixed(2));
-            const voucherTotalDeductions = Number(toNumber(voucher.total_deductions).toFixed(2));
-            const voucherFinal = Number((voucherSumIfa - voucherTotalDeductions).toFixed(2));
+            const remainingCommission = Number((safeCommissionAmount - allocatedCommission).toFixed(2));
+            const proportionalCommission = sumIfas > 0
+                ? Number(((voucherSumIfa / sumIfas) * safeCommissionAmount).toFixed(2))
+                : 0;
+            const voucherCommission = index === voucherRes.rows.length - 1
+                ? remainingCommission
+                : Math.max(0, Math.min(remainingCommission, proportionalCommission));
+            allocatedCommission = Number((allocatedCommission + voucherCommission).toFixed(2));
+            const voucherFinal = Number((voucherSumIfa - voucherCommission).toFixed(2));
             totalFinalBalance += voucherFinal;
             await client.query(voucherInsert, [
                 settlement.id,
@@ -221,7 +245,7 @@ const createSettlement = async (req, res, next) => {
                 voucher.vehicle_number,
                 voucher.voucher_number,
                 voucherSumIfa,
-                voucherTotalDeductions,
+                voucherCommission,
                 voucherFinal
             ]);
         }

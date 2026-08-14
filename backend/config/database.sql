@@ -112,6 +112,7 @@ CREATE TABLE IF NOT EXISTS loading_advances (
     vehicle_body_type VARCHAR(50) NOT NULL,
     owner_name VARCHAR(255) NOT NULL,
     owner_type VARCHAR(50) NOT NULL,
+    owner_id INTEGER REFERENCES owners(id) ON DELETE RESTRICT,
     product_name VARCHAR(255) NOT NULL,
     invoice_number VARCHAR(50) NOT NULL,
     to_place VARCHAR(255) NOT NULL,
@@ -130,6 +131,7 @@ CREATE TABLE IF NOT EXISTS loading_advances (
     fuel_rate DECIMAL(10, 2) NOT NULL,
     fuel_amount DECIMAL(12, 2) NOT NULL,
     driver_name VARCHAR(255),
+    driver_id INTEGER REFERENCES drivers(id) ON DELETE RESTRICT,
     driver_loading_advance DECIMAL(12, 2) NOT NULL,
     trip_balance DECIMAL(12, 2) NOT NULL,
     commission_pct DECIMAL(5, 2) NOT NULL,
@@ -158,6 +160,8 @@ ALTER TABLE IF EXISTS loading_advances ADD COLUMN IF NOT EXISTS fuel_litre DECIM
 ALTER TABLE IF EXISTS loading_advances ADD COLUMN IF NOT EXISTS fuel_rate DECIMAL(10, 2);
 ALTER TABLE IF EXISTS loading_advances ADD COLUMN IF NOT EXISTS fuel_amount DECIMAL(12, 2);
 ALTER TABLE IF EXISTS loading_advances ADD COLUMN IF NOT EXISTS driver_name VARCHAR(255);
+ALTER TABLE IF EXISTS loading_advances ADD COLUMN IF NOT EXISTS owner_id INTEGER REFERENCES owners(id) ON DELETE RESTRICT;
+ALTER TABLE IF EXISTS loading_advances ADD COLUMN IF NOT EXISTS driver_id INTEGER REFERENCES drivers(id) ON DELETE RESTRICT;
 ALTER TABLE IF EXISTS loading_advances ADD COLUMN IF NOT EXISTS driver_loading_advance DECIMAL(12, 2);
 ALTER TABLE IF EXISTS loading_advances ADD COLUMN IF NOT EXISTS trip_balance DECIMAL(12, 2);
 ALTER TABLE IF EXISTS loading_advances ADD COLUMN IF NOT EXISTS commission_pct DECIMAL(5, 2);

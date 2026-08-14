@@ -97,7 +97,7 @@ const OwnVehicleSettlement = () => {
     );
 
     const driverSalaryPayable = useMemo(
-        () => Number((totalDriverBalance - pendingAdvance).toFixed(2)),
+        () => Number(Math.max(totalDriverBalance - pendingAdvance, 0).toFixed(2)),
         [totalDriverBalance, pendingAdvance]
     );
 
@@ -283,6 +283,8 @@ const OwnVehicleSettlement = () => {
                 setSuccessMsg('Own vehicle settlement saved successfully');
                 await loadReadyVouchers(form.driver_id, form.vehicle_number || null);
                 await loadSettlements();
+                const driversRes = await ownVehicleSettlementAPI.getDrivers();
+                if (driversRes.success) setDrivers(driversRes.data);
             }
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to settle vouchers');
@@ -374,19 +376,19 @@ const OwnVehicleSettlement = () => {
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                                 <div className="space-y-1">
                                     <Label className="required">Bank Name</Label>
-                                    <Input value={form.bank_name} onChange={e => setForm(prev => ({ ...prev, bank_name: e.target.value }))} />
+                                    <Input value={form.bank_name} disabled className="bg-slate-50" />
                                 </div>
                                 <div className="space-y-1">
                                     <Label className="required">Branch</Label>
-                                    <Input value={form.branch} onChange={e => setForm(prev => ({ ...prev, branch: e.target.value }))} />
+                                    <Input value={form.branch} disabled className="bg-slate-50" />
                                 </div>
                                 <div className="space-y-1">
                                     <Label className="required">Account Number</Label>
-                                    <Input value={form.account_number} onChange={e => setForm(prev => ({ ...prev, account_number: e.target.value }))} />
+                                    <Input value={form.account_number} disabled className="bg-slate-50" />
                                 </div>
                                 <div className="space-y-1">
                                     <Label className="required">IFSC Code</Label>
-                                    <Input value={form.ifsc_code} onChange={e => setForm(prev => ({ ...prev, ifsc_code: e.target.value.toUpperCase() }))} />
+                                    <Input value={form.ifsc_code} disabled className="bg-slate-50" />
                                 </div>
                             </div>
                         )}

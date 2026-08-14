@@ -319,6 +319,39 @@ const createLoadingAdvance = async (req, res, next) => {
 
         if (!(await existsVehicle(vehicle_registration_number))) return res.status(400).json({ success: false, message: 'Invalid vehicle registration number' });
         if (!(await existsProduct(product_name))) return res.status(400).json({ success: false, message: 'Invalid product name' });
+
+        const ownerRes = await client.query(
+            `SELECT id
+             FROM owners
+             WHERE owner_name = $1 AND owner_type = $2
+             ORDER BY id`,
+            [owner_name, owner_type]
+        );
+        if (ownerRes.rows.length === 0) {
+            return res.status(400).json({ success: false, message: 'Invalid owner selection' });
+        }
+        if (ownerRes.rows.length > 1) {
+            return res.status(400).json({ success: false, message: 'Owner name is ambiguous; select a unique owner' });
+        }
+        const ownerId = ownerRes.rows[0].id;
+
+        let driverId = null;
+        if (!isCommissioned) {
+            const driverRes = await client.query(
+                `SELECT id
+                 FROM drivers
+                 WHERE driver_name = $1 AND driver_status = TRUE
+                 ORDER BY id`,
+                [driver_name]
+            );
+            if (driverRes.rows.length === 0) {
+                return res.status(400).json({ success: false, message: 'Invalid active driver selection' });
+            }
+            if (driverRes.rows.length > 1) {
+                return res.status(400).json({ success: false, message: 'Driver name is ambiguous; select a unique driver' });
+            }
+            driverId = driverRes.rows[0].id;
+        }
         const fromPlaceAliases = getFromPlaceAliasesForPrefix(login_prefix);
 
         if (!isCommissioned && !driver_name) return res.status(400).json({ success: false, message: 'Driver name is required' });
@@ -380,7 +413,9 @@ const createLoadingAdvance = async (req, res, next) => {
 
         const parsedDriverLoadingAdvance = Number(driver_loading_advance) || 0;
         const sum_ifas = invoiceRows.reduce((s, r) => s + (Number(r.ifa_amount) || 0), 0);
-        const commission_amount = isCommissioned ? Math.ceil((sum_ifas * commission_pct) / 100) : 0;
+        const commission_amount = isCommissioned
+            ? Number(((sum_ifas * commission_pct) / 100).toFixed(2))
+            : 0;
         const expenseSum = parsedDriverBata + parsedUnloading + parsedTarpaulin + parsedCityTax + parsedMaintenance;
         const predefined_expenses = commission_amount + parsedUnloading + parsedTarpaulin + parsedCityTax + parsedMaintenance;
         const gross_amount = isCommissioned ? (commission_amount - expenseSum) : (sum_ifas - expenseSum);
@@ -392,8 +427,8 @@ const createLoadingAdvance = async (req, res, next) => {
         await client.query('BEGIN');
         const insertMain = `
             INSERT INTO loading_advances
-            (voucher_number, vehicle_registration_number, vehicle_type, vehicle_sub_type, vehicle_body_type, owner_name, owner_type, product_name, invoice_number, to_place, dealer_name, kt_freight, quantity, ifa_amount, sum_ifas, driver_bata, unloading, tarpaulin, city_tax, maintenance, pump_name, fuel_litre, fuel_rate, fuel_amount, driver_name, driver_loading_advance, trip_balance, commission_pct, predefined_expenses, invoice_date, tds)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31)
+            (voucher_number, vehicle_registration_number, vehicle_type, vehicle_sub_type, vehicle_body_type, owner_name, owner_type, owner_id, product_name, invoice_number, to_place, dealer_name, kt_freight, quantity, ifa_amount, sum_ifas, driver_bata, unloading, tarpaulin, city_tax, maintenance, pump_name, fuel_litre, fuel_rate, fuel_amount, driver_name, driver_id, driver_loading_advance, trip_balance, commission_pct, predefined_expenses, invoice_date, tds)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33)
             RETURNING *
         `;
         const mainVals = [
@@ -404,6 +439,7 @@ const createLoadingAdvance = async (req, res, next) => {
             vehicle_body_type,
             owner_name,
             owner_type,
+            ownerId,
             product_name,
             firstInv.invoice_number,
             firstInv.to_place,
@@ -422,6 +458,7 @@ const createLoadingAdvance = async (req, res, next) => {
             parsedFuelRate,
             fuel_amount,
             isDedicated ? (driver_name || null) : (isCommissioned ? null : driver_name),
+            driverId,
             parsedDriverLoadingAdvance,
             trip_balance,
             commission_pct,

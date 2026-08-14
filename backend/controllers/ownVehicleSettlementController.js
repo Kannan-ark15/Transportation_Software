@@ -145,9 +145,9 @@ const getReadyVouchers = async (req, res, next) => {
                AND ovsv.id IS NULL
                AND EXISTS (
                     SELECT 1
-                    FROM drivers d
-                    WHERE d.driver_status = TRUE
-                        AND d.driver_name = la.driver_name
+                     FROM drivers d
+                     WHERE d.driver_status = TRUE
+                         AND (d.id = la.driver_id OR (la.driver_id IS NULL AND d.driver_name = la.driver_name))
                         AND ($2::INT IS NULL OR d.id = $2)
                )
                AND ($3::TEXT IS NULL OR la.vehicle_registration_number = $3)
@@ -215,10 +215,10 @@ const createSettlement = async (req, res, next) => {
         }
 
         const driver = driverRes.rows[0];
-        const effectiveBankName = cash_bank === 'Bank' ? (bank_name || driver.bank_name || null) : null;
-        const effectiveBranch = cash_bank === 'Bank' ? (branch || driver.branch || null) : null;
-        const effectiveAccountNumber = cash_bank === 'Bank' ? (account_number || driver.account_number || null) : null;
-        const effectiveIfscCode = cash_bank === 'Bank' ? (ifsc_code || driver.ifsc_code || null) : null;
+        const effectiveBankName = cash_bank === 'Bank' ? driver.bank_name || null : null;
+        const effectiveBranch = cash_bank === 'Bank' ? driver.branch || null : null;
+        const effectiveAccountNumber = cash_bank === 'Bank' ? driver.account_number || null : null;
+        const effectiveIfscCode = cash_bank === 'Bank' ? driver.ifsc_code || null : null;
 
         if (cash_bank === 'Bank' && (!effectiveBankName || !effectiveBranch || !effectiveAccountNumber || !effectiveIfscCode)) {
             return res.status(400).json({ success: false, message: 'Bank details are required when cash_bank is Bank' });
@@ -287,10 +287,10 @@ const createSettlement = async (req, res, next) => {
              WHERE a.id = ANY($1::INT[])
                AND a.voucher_status = $2
                AND LOWER(TRIM(COALESCE(la.owner_type, ''))) = 'own'
-               AND la.driver_name = $3
+               AND (la.driver_id = $3 OR (la.driver_id IS NULL AND la.driver_name = $4))
                AND ovsv.id IS NULL
              ORDER BY a.id`,
-            [ackIds, READY_STATUS, driver.driver_name]
+             [ackIds, READY_STATUS, driver.id, driver.driver_name]
         );
 
         if (voucherRes.rows.length !== ackIds.length) {
@@ -364,7 +364,7 @@ const createSettlement = async (req, res, next) => {
         const roundedTotalDriverBata = Number(totalDriverBata.toFixed(2));
         const roundedTotalDriverBalance = Number(totalDriverBalance.toFixed(2));
         const pendingAdvance = await getPendingAdvanceForDriver(client, driver.id);
-        const driverSalaryPayable = Number((roundedTotalDriverBalance - pendingAdvance).toFixed(2));
+        const driverSalaryPayable = Number(Math.max(roundedTotalDriverBalance - pendingAdvance, 0).toFixed(2));
 
         await client.query('BEGIN');
         inTx = true;

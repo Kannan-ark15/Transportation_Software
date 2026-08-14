@@ -51,7 +51,7 @@ const LoadingAdvance = () => {
     const maintenance = Number(form.maintenance) || 0;
     const expenseSum = driverBata + unloadingCharges + tarpaulinVal + cityTax + maintenance;
     const ownerType = String(form.owner_type || '').toLowerCase(), isDedicated = ownerType === 'dedicated', isCommissioned = isDedicated || ownerType === 'market', commissionPct = isCommissioned ? 6 : 0;
-    const commissionAmt = isCommissioned ? Math.ceil((sumIfas * commissionPct) / 100) : 0;
+    const commissionAmt = isCommissioned ? Number(((sumIfas * commissionPct) / 100).toFixed(2)) : 0;
     const grossAmountVal = isCommissioned ? (commissionAmt - expenseSum) : (sumIfas - expenseSum);
 
     const predefinedExpenses = (commissionAmt + unloadingCharges + tarpaulinVal + cityTax + maintenance).toFixed(2);
