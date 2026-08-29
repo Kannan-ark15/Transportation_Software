@@ -198,8 +198,8 @@ const createSettlement = async (req, res, next) => {
         const settlementRes = await client.query(
             `INSERT INTO dedicated_market_settlements
                 (owner_id, owner_name, owner_type, cash_bank, bank_name, branch, account_no, ifsc_code,
-                 sum_ifas, commission_percent, commission_amount, settlement_balance, settled)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+                 sum_ifas, commission_percent, commission_amount, settlement_balance, settled, settled_at)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, NULL)
              RETURNING *`,
             [
                 owner.id,
@@ -214,7 +214,7 @@ const createSettlement = async (req, res, next) => {
                 commissionPercent,
                 safeCommissionAmount,
                 settlementBalance,
-                true
+                false
             ]
         );
 

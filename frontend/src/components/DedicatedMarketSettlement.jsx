@@ -443,6 +443,7 @@ const DedicatedMarketSettlement = () => {
                                         <TableHead>Sum IFAs</TableHead>
                                         <TableHead>Total Deductions</TableHead>
                                         <TableHead>Settlement Balance</TableHead>
+                                        <TableHead>Status</TableHead>
                                         <TableHead>Settled Date</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -462,6 +463,13 @@ const DedicatedMarketSettlement = () => {
                                             <TableCell>{Number(row.sum_ifas || 0).toFixed(2)}</TableCell>
                                             <TableCell>{Number(row.total_deductions ?? row.commission_amount ?? 0).toFixed(2)}</TableCell>
                                             <TableCell>{Number(row.settlement_balance || 0).toFixed(2)}</TableCell>
+                                            <TableCell>
+                                                <Badge className={row.settled
+                                                    ? 'bg-green-100 text-green-700 border-none'
+                                                    : 'bg-amber-100 text-amber-700 border-none'}>
+                                                    {row.settled ? 'Settled' : 'Pending Payment'}
+                                                </Badge>
+                                            </TableCell>
                                             <TableCell>{row.settled_at ? new Date(row.settled_at).toLocaleDateString() : '-'}</TableCell>
                                         </TableRow>
                                     ))}

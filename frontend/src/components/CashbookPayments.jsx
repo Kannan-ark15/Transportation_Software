@@ -161,11 +161,16 @@ const CashbookPayments = () => {
                 label: `Driver ${row.driver_name || 'NA'} | Vehicles: ${row.vehicle_numbers || 'NA'} | Amount ${formatMoney(row.driver_salary_payable)}`
             }));
         } else if (formData.reference_module === 'Dedicated Owner Payable') {
-            options = dedicatedOwnerPayables.map((row) => ({
-                id: row.id,
-                amount: row.settlement_balance,
-                label: `Owner ${row.owner_name || 'NA'} | Vehicles: ${row.vehicle_numbers || 'NA'} | Amount ${formatMoney(row.settlement_balance)}`
-            }));
+            options = dedicatedOwnerPayables
+                .filter((row) => !selectedVehicleId || (
+                    row.vehicle_ids?.length ? row.vehicle_ids : [row.vehicle_id]
+                ).some((id) => String(id || '') === selectedVehicleId))
+                .map((row) => ({
+                    id: row.id,
+                    amount: row.settlement_balance,
+                    vehicle_id: row.vehicle_id,
+                    label: `Owner ${row.owner_name || 'NA'} | Vehicles: ${row.vehicle_numbers || 'NA'} | Amount ${formatMoney(row.settlement_balance)}`
+                }));
         } else if (formData.reference_module === 'Due Settlement') {
             const scopedDueSettlements = selectedVehicleId
                 ? dueSettlements.filter((row) => String(row.vehicle_id || '') === selectedVehicleId)
@@ -219,6 +224,27 @@ const CashbookPayments = () => {
             ? selectedPayment.reference_amount
             : null
     );
+
+    useEffect(() => {
+        if (!modalOpen || modalMode !== 'add' || formData.reference_module !== 'Dedicated Owner Payable') return;
+        if (!selectedVehicleId || formData.reference_record_id || referenceOptions.length !== 1) return;
+
+        const [reference] = referenceOptions;
+        setFormData((prev) => prev.reference_record_id
+            ? prev
+            : {
+                ...prev,
+                reference_record_id: String(reference.id),
+                amount_paid: String(reference.amount ?? '')
+            });
+    }, [
+        modalOpen,
+        modalMode,
+        formData.reference_module,
+        formData.reference_record_id,
+        selectedVehicleId,
+        referenceOptions
+    ]);
 
     const filteredPayments = useMemo(() => {
         const q = search.trim().toLowerCase();
@@ -282,7 +308,10 @@ const CashbookPayments = () => {
             if (field === 'reference_module') {
                 next.reference_record_id = '';
             }
-            if (field === 'vehicle_id' && next.reference_module === 'Due Settlement') {
+            if (field === 'vehicle_id' && (
+                next.reference_module === 'Due Settlement'
+                || next.reference_module === 'Dedicated Owner Payable'
+            )) {
                 next.reference_record_id = '';
             }
             if (field === 'vehicle_id' && next.payment_category === 'Transactions') {
@@ -657,7 +686,7 @@ const CashbookPayments = () => {
                                         {formErrors.reference_record_id && <p className="text-[10px] text-red-500">{formErrors.reference_record_id}</p>}
                                     </div>
                                     <div className="space-y-2">
-                                        <Label>Reference Amount</Label>
+                                        <Label>Amount for Settlement</Label>
                                         <Input disabled className="bg-slate-50" value={referenceAmount != null ? formatMoney(referenceAmount) : ''} />
                                     </div>
                                 </div>
