@@ -264,6 +264,18 @@ const CashbookPayments = () => {
         ));
     }, [payments, search]);
 
+    const filteredPendingOwnerPayables = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        if (!q) return [];
+
+        return dedicatedOwnerPayables.filter((row) => (
+            String(row.vehicle_number || '').toLowerCase().includes(q)
+            || String(row.vehicle_numbers || '').toLowerCase().includes(q)
+            || String(row.owner_name || '').toLowerCase().includes(q)
+            || String(row.voucher_numbers || '').toLowerCase().includes(q)
+        ));
+    }, [dedicatedOwnerPayables, search]);
+
     const startIndex = (currentPage - 1) * itemsPerPage;
     const paginatedItems = filteredPayments.slice(startIndex, startIndex + itemsPerPage);
 
@@ -484,7 +496,42 @@ const CashbookPayments = () => {
                         </div>
                     </div>
 
-                    {filteredPayments.length === 0 ? (
+                    {filteredPendingOwnerPayables.length > 0 && (
+                        <div className="rounded-md border border-amber-200 bg-amber-50/60 overflow-hidden">
+                            <div className="px-4 py-3 border-b border-amber-200">
+                                <div className="font-semibold text-amber-900">Pending owner balance</div>
+                                <div className="text-xs text-amber-700">
+                                    Remaining ready vouchers for the searched vehicle, excluding balance-settled and already-paid vouchers.
+                                </div>
+                            </div>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead className="font-bold text-slate-700">Owner</TableHead>
+                                        <TableHead className="font-bold text-slate-700">Vehicle</TableHead>
+                                        <TableHead className="font-bold text-slate-700">Vouchers</TableHead>
+                                        <TableHead className="font-bold text-slate-700">Pending Amount</TableHead>
+                                        <TableHead className="font-bold text-slate-700">Status</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {filteredPendingOwnerPayables.map((row) => (
+                                        <TableRow key={`pending-${row.owner_id || row.owner_name}-${row.vehicle_id || row.vehicle_number}`}>
+                                            <TableCell className="font-medium">{row.owner_name || '-'}</TableCell>
+                                            <TableCell className="font-medium">{row.vehicle_number || row.vehicle_numbers || '-'}</TableCell>
+                                            <TableCell className="text-xs">{row.voucher_numbers || '-'}</TableCell>
+                                            <TableCell className="font-semibold text-amber-900">{formatMoney(row.settlement_balance)}</TableCell>
+                                            <TableCell>
+                                                <Badge className="border-none bg-amber-100 text-amber-700">Pending</Badge>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    )}
+
+                    {filteredPayments.length === 0 && filteredPendingOwnerPayables.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-12 text-slate-400">
                             <div className="bg-slate-50 p-6 rounded-full mb-4">
                                 <SearchX className="w-12 h-12 text-slate-300" />
@@ -494,6 +541,10 @@ const CashbookPayments = () => {
                             <Button variant="outline" onClick={() => handleOpenModal('add')}>
                                 Add Payment
                             </Button>
+                        </div>
+                    ) : filteredPayments.length === 0 ? (
+                        <div className="py-6 text-center text-sm text-slate-500">
+                            No recorded payments match this search. The pending balance is shown above.
                         </div>
                     ) : (
                         <>
