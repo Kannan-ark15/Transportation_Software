@@ -66,6 +66,7 @@ const emptyForm = {
     payment_category: 'Transactions',
     reference_category: 'Cash',
     reference_module: '',
+    reference_record_type: 'Settlement',
     reference_record_id: '',
     amount_paid: '',
     remarks: ''
@@ -158,6 +159,7 @@ const CashbookPayments = () => {
             options = driverSalaryPayables.map((row) => ({
                 id: row.id,
                 amount: row.driver_salary_payable,
+                reference_record_type: 'Settlement',
                 label: `Driver ${row.driver_name || 'NA'} | Vehicles: ${row.vehicle_numbers || 'NA'} | Amount ${formatMoney(row.driver_salary_payable)}`
             }));
         } else if (formData.reference_module === 'Dedicated Owner Payable') {
@@ -169,7 +171,8 @@ const CashbookPayments = () => {
                     id: row.id,
                     amount: row.settlement_balance,
                     vehicle_id: row.vehicle_id,
-                    label: `Owner ${row.owner_name || 'NA'} | Vehicles: ${row.vehicle_numbers || 'NA'} | Amount ${formatMoney(row.settlement_balance)}`
+                    reference_record_type: row.reference_record_type || 'Settlement',
+                    label: `Owner ${row.owner_name || 'NA'} | Vehicle: ${row.vehicle_number || row.vehicle_numbers || 'NA'} | Vouchers: ${row.voucher_numbers || 'NA'} | Amount ${formatMoney(row.settlement_balance)}`
                 }));
         } else if (formData.reference_module === 'Due Settlement') {
             const scopedDueSettlements = selectedVehicleId
@@ -180,6 +183,7 @@ const CashbookPayments = () => {
                 id: row.id,
                 amount: row.due_amount,
                 vehicle_id: row.vehicle_id,
+                reference_record_type: 'Settlement',
                 label: `Vehicle ${row.vehicle_number || 'NA'} | Inst ${row.installment_number || 'NA'} | Due ${row.due_date || 'NA'} | Amount ${formatMoney(row.due_amount)}`
             }));
         } else if (formData.reference_module === 'Insurance') {
@@ -187,6 +191,7 @@ const CashbookPayments = () => {
                 id: row.id,
                 amount: row.insurance_amount,
                 vehicle_id: row.id,
+                reference_record_type: 'Settlement',
                 label: `Vehicle ${row.vehicle_no || 'NA'} | Policy ${row.insurance_no || 'NA'} | Amount ${formatMoney(row.insurance_amount)}`
             }));
         }
@@ -198,6 +203,7 @@ const CashbookPayments = () => {
                     id: currentId,
                     amount: selectedPayment.reference_amount,
                     vehicle_id: selectedPayment.vehicle_id,
+                    reference_record_type: selectedPayment.reference_record_type || 'Settlement',
                     label: selectedPayment.reference_label || `Record ${currentId}`
                 },
                 ...options
@@ -234,6 +240,7 @@ const CashbookPayments = () => {
             ? prev
             : {
                 ...prev,
+                reference_record_type: reference.reference_record_type || 'Settlement',
                 reference_record_id: String(reference.id),
                 amount_paid: String(reference.amount ?? '')
             });
@@ -280,6 +287,7 @@ const CashbookPayments = () => {
             payment_category: payment.payment_category || 'Transactions',
             reference_category: payment.reference_category || 'Cash',
             reference_module: payment.reference_module || '',
+            reference_record_type: payment.reference_record_type || 'Settlement',
             reference_record_id: payment.reference_record_id ? String(payment.reference_record_id) : '',
             amount_paid: payment.amount_paid != null ? String(payment.amount_paid) : '',
             remarks: payment.remarks || ''
@@ -294,6 +302,7 @@ const CashbookPayments = () => {
                 const modules = REFERENCE_MODULES_BY_CATEGORY[value] || [];
                 if (!modules.includes(next.reference_module)) {
                     next.reference_module = '';
+                    next.reference_record_type = 'Settlement';
                     next.reference_record_id = '';
                 }
                 if (value === 'Transactions' && next.vehicle_id) {
@@ -301,17 +310,20 @@ const CashbookPayments = () => {
                     const preferredModule = getTransactionModuleByVehicleType(selectedVehicle);
                     if (preferredModule) {
                         next.reference_module = preferredModule;
+                        next.reference_record_type = 'Settlement';
                         next.reference_record_id = '';
                     }
                 }
             }
             if (field === 'reference_module') {
+                next.reference_record_type = 'Settlement';
                 next.reference_record_id = '';
             }
             if (field === 'vehicle_id' && (
                 next.reference_module === 'Due Settlement'
                 || next.reference_module === 'Dedicated Owner Payable'
             )) {
+                next.reference_record_type = 'Settlement';
                 next.reference_record_id = '';
             }
             if (field === 'vehicle_id' && next.payment_category === 'Transactions') {
@@ -319,6 +331,7 @@ const CashbookPayments = () => {
                 const preferredModule = getTransactionModuleByVehicleType(selectedVehicle);
                 if (preferredModule && preferredModule !== next.reference_module) {
                     next.reference_module = preferredModule;
+                    next.reference_record_type = 'Settlement';
                     next.reference_record_id = '';
                 }
             }
@@ -328,9 +341,14 @@ const CashbookPayments = () => {
 
     const handleReferenceSelect = (value) => {
         setFormData((prev) => {
-            const next = { ...prev, reference_record_id: value };
+            const next = {
+                ...prev,
+                reference_record_id: value,
+                reference_record_type: 'Settlement'
+            };
             const ref = referenceOptions.find((opt) => String(opt.id) === String(value));
             if (ref) {
+                next.reference_record_type = ref.reference_record_type || 'Settlement';
                 if (!next.amount_paid) next.amount_paid = String(ref.amount ?? '');
                 if (ref.vehicle_id) next.vehicle_id = String(ref.vehicle_id);
             }
@@ -367,6 +385,7 @@ const CashbookPayments = () => {
             payment_category: formData.payment_category,
             reference_category: formData.reference_category,
             reference_module: formData.reference_module,
+            reference_record_type: formData.reference_record_type || 'Settlement',
             reference_record_id: Number(formData.reference_record_id),
             amount_paid: Number(formData.amount_paid),
             remarks: formData.remarks || null

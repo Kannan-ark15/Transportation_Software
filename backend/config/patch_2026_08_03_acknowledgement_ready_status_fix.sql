@@ -39,5 +39,5 @@ WHERE voucher_status <> 'Pending'
       WHERE ai.acknowledgement_id = a.id
         AND ai.status <> 'Acknowledged'
   );
-
+  
 COMMIT;

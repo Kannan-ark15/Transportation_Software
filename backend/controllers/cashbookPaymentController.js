@@ -3,6 +3,8 @@ const pool = require('../config/database');
 const PAYMENT_CATEGORIES = ['Transactions', 'Advances and Loans', 'Masters'];
 const REFERENCE_CATEGORIES = ['Cash', 'Bank'];
 const READY_STATUS = 'Ready for Settlement';
+const SETTLEMENT_REFERENCE_TYPE = 'Settlement';
+const VEHICLE_GROUP_REFERENCE_TYPE = 'VehicleVoucherGroup';
 const REFERENCE_MODULES_BY_CATEGORY = {
     'Transactions': ['Driver Salary Payable', 'Dedicated Owner Payable'],
     'Advances and Loans': ['Due Settlement'],
@@ -30,7 +32,109 @@ const fetchVehicle = async (client, vehicleId) => {
     return result.rows[0] || null;
 };
 
-const fetchReferenceInfo = async (client, referenceModule, referenceRecordId) => {
+const calculateDedicatedVoucherPayable = (sumIfas, commissionPercent) => {
+    const normalizedSumIfas = toNumber(sumIfas, 0);
+    const normalizedCommissionPercent = toNumber(commissionPercent, 6);
+    return Number((normalizedSumIfas - ((normalizedSumIfas * normalizedCommissionPercent) / 100)).toFixed(2));
+};
+
+const fetchDedicatedVehicleGroupInfo = async (client, anchorLoadingAdvanceId, excludePaymentId = null) => {
+    const anchorRes = await client.query(
+        `SELECT id, owner_id, owner_name, owner_type, vehicle_registration_number
+         FROM loading_advances
+         WHERE id = $1`,
+        [anchorLoadingAdvanceId]
+    );
+    const anchor = anchorRes.rows[0];
+    if (!anchor) return null;
+
+    const ownerRes = await client.query(
+        `SELECT id, owner_name, owner_type
+         FROM owners
+         WHERE (id = $1 OR ($1::INT IS NULL AND owner_name = $2 AND owner_type = $3))
+           AND owner_type IN ('Dedicated', 'Market')`,
+        [anchor.owner_id, anchor.owner_name, anchor.owner_type]
+    );
+    const owner = ownerRes.rows[0] || {
+        id: anchor.owner_id,
+        owner_name: anchor.owner_name,
+        owner_type: anchor.owner_type
+    };
+    if (!owner.id || !['Dedicated', 'Market'].includes(owner.owner_type)) return null;
+
+    const result = await client.query(
+        `SELECT
+            la.id AS loading_advance_id,
+            a.id AS acknowledgement_id,
+            a.voucher_number,
+            la.vehicle_registration_number AS vehicle_number,
+            v.id AS vehicle_id,
+            COALESCE(
+                la.sum_ifas,
+                (SELECT SUM(lai.ifa_amount)
+                 FROM loading_advance_invoices lai
+                 WHERE lai.loading_advance_id = la.id),
+                0
+            )::DECIMAL(12,2) AS sum_ifas,
+            COALESCE(la.commission_pct, 6)::DECIMAL(12,4) AS commission_pct
+         FROM acknowledgements a
+         JOIN loading_advances la ON la.id = a.loading_advance_id
+         JOIN owners o ON (
+             o.id = la.owner_id
+             OR (
+                 la.owner_id IS NULL
+                 AND o.owner_name = la.owner_name
+                 AND o.owner_type = la.owner_type
+             )
+         )
+         JOIN vehicles v ON v.vehicle_no = la.vehicle_registration_number
+         WHERE a.voucher_status = $1
+           AND o.id = $2
+           AND la.vehicle_registration_number = $3
+           AND NOT EXISTS (
+               SELECT 1
+               FROM dedicated_market_settlement_vouchers dmsv
+               WHERE dmsv.loading_advance_id = la.id
+           )
+           AND NOT EXISTS (
+               SELECT 1
+               FROM cashbook_payments cp
+               WHERE cp.reference_module = 'Dedicated Owner Payable'
+                 AND COALESCE(cp.reference_record_type, $4) = $4
+                 AND ($5::INT IS NULL OR cp.id <> $5)
+                 AND la.id = ANY(COALESCE(cp.reference_loading_advance_ids, ARRAY[]::INTEGER[]))
+           )
+         ORDER BY la.id ASC`,
+        [READY_STATUS, owner.id, anchor.vehicle_registration_number, VEHICLE_GROUP_REFERENCE_TYPE, excludePaymentId]
+    );
+
+    if (result.rows.length === 0) return null;
+
+    const amount = Number(result.rows.reduce(
+        (sum, row) => sum + calculateDedicatedVoucherPayable(row.sum_ifas, row.commission_pct),
+        0
+    ).toFixed(2));
+    const vehicleIds = [...new Set(result.rows.map(row => Number(row.vehicle_id)).filter(Number.isInteger))];
+
+    return {
+        amount,
+        label: owner.owner_name || anchor.owner_name || null,
+        vehicle_id: vehicleIds.length === 1 ? vehicleIds[0] : null,
+        vehicle_ids: vehicleIds,
+        vehicle_numbers: anchor.vehicle_registration_number || null,
+        loading_advance_ids: result.rows.map(row => Number(row.loading_advance_id)),
+        voucher_numbers: result.rows.map(row => row.voucher_number).filter(Boolean).join(', '),
+        settled: false
+    };
+};
+
+const fetchReferenceInfo = async (
+    client,
+    referenceModule,
+    referenceRecordId,
+    referenceRecordType = SETTLEMENT_REFERENCE_TYPE,
+    excludePaymentId = null
+) => {
     switch (referenceModule) {
         case 'Driver Salary Payable': {
             const result = await client.query(
@@ -54,6 +158,10 @@ const fetchReferenceInfo = async (client, referenceModule, referenceRecordId) =>
             };
         }
         case 'Dedicated Owner Payable': {
+            if (referenceRecordType === VEHICLE_GROUP_REFERENCE_TYPE) {
+                return fetchDedicatedVehicleGroupInfo(client, referenceRecordId, excludePaymentId);
+            }
+
             const result = await client.query(
                 `SELECT
                     s.id,
@@ -182,6 +290,9 @@ const PAYMENT_SELECT = `
         p.*,
         COALESCE(v.vehicle_no, p.vehicle_number) AS vehicle_number_display,
         CASE
+            WHEN p.reference_module = 'Dedicated Owner Payable'
+                AND COALESCE(p.reference_record_type, 'Settlement') = 'VehicleVoucherGroup'
+                THEN p.reference_amount_snapshot
             WHEN p.reference_module = 'Driver Salary Payable' THEN ovs.driver_salary_payable
             WHEN p.reference_module = 'Dedicated Owner Payable' THEN dms.settlement_balance
             WHEN p.reference_module = 'Due Settlement' THEN lrt.due_amount
@@ -189,6 +300,9 @@ const PAYMENT_SELECT = `
             ELSE NULL
         END AS reference_amount,
         CASE
+            WHEN p.reference_module = 'Dedicated Owner Payable'
+                AND COALESCE(p.reference_record_type, 'Settlement') = 'VehicleVoucherGroup'
+                THEN dmp.owner_name
             WHEN p.reference_module = 'Driver Salary Payable' THEN ovs.driver_name
             WHEN p.reference_module = 'Dedicated Owner Payable' THEN dms.owner_name
             WHEN p.reference_module = 'Due Settlement' THEN COALESCE(v2.vehicle_no, lm.vehicle_number)
@@ -196,6 +310,9 @@ const PAYMENT_SELECT = `
             ELSE NULL
         END AS reference_party,
         CASE
+            WHEN p.reference_module = 'Dedicated Owner Payable'
+                AND COALESCE(p.reference_record_type, 'Settlement') = 'VehicleVoucherGroup'
+                THEN dmp.vehicle_numbers
             WHEN p.reference_module = 'Driver Salary Payable' THEN ovs.vehicle_numbers
             WHEN p.reference_module = 'Dedicated Owner Payable' THEN dms.vehicle_numbers
             ELSE NULL
@@ -234,6 +351,18 @@ const PAYMENT_SELECT = `
         LEFT JOIN dedicated_market_settlement_vouchers sv ON sv.settlement_id = s.id
         GROUP BY s.id
     ) dms ON p.reference_module = 'Dedicated Owner Payable' AND p.reference_record_id = dms.id
+    LEFT JOIN (
+        SELECT
+            cp.id AS payment_id,
+            MAX(la.owner_name) AS owner_name,
+            COALESCE(string_agg(DISTINCT la.vehicle_registration_number, ', ' ORDER BY la.vehicle_registration_number), '') AS vehicle_numbers
+        FROM cashbook_payments cp
+        JOIN loading_advances la
+            ON la.id = ANY(COALESCE(cp.reference_loading_advance_ids, ARRAY[]::INTEGER[]))
+        WHERE cp.reference_module = 'Dedicated Owner Payable'
+          AND COALESCE(cp.reference_record_type, 'Settlement') = 'VehicleVoucherGroup'
+        GROUP BY cp.id
+    ) dmp ON p.id = dmp.payment_id
     LEFT JOIN loan_repayment_trackings lrt ON p.reference_module = 'Due Settlement' AND p.reference_record_id = lrt.id
     LEFT JOIN loan_masters lm ON lrt.loan_master_id = lm.id
     LEFT JOIN vehicles v2 ON lm.vehicle_id = v2.id
@@ -270,28 +399,72 @@ const getCashbookMeta = async (req, res, next) => {
                  ORDER BY s.created_at DESC`
             ),
             pool.query(
-                `SELECT
-                    s.id,
-                    s.owner_id,
-                    s.owner_name,
-                    COALESCE(
-                        SUM(sv.final_balance) FILTER (WHERE a.voucher_status = $1),
-                        0
-                    )::DECIMAL(12,2) AS settlement_balance,
-                    s.created_at,
-                    s.settled,
-                    CASE WHEN COUNT(DISTINCT v.id) = 1 THEN MIN(v.id) ELSE NULL END AS vehicle_id,
-                    COALESCE(array_agg(DISTINCT v.id) FILTER (WHERE v.id IS NOT NULL), ARRAY[]::INTEGER[]) AS vehicle_ids,
-                    COALESCE(string_agg(DISTINCT sv.vehicle_number, ', ' ORDER BY sv.vehicle_number), '') AS vehicle_numbers
-                 FROM dedicated_market_settlements s
-                 JOIN dedicated_market_settlement_vouchers sv ON sv.settlement_id = s.id
-                 LEFT JOIN acknowledgements a ON a.id = sv.acknowledgement_id
-                 LEFT JOIN vehicles v ON v.vehicle_no = sv.vehicle_number
-                 WHERE s.settled = FALSE
-                 GROUP BY s.id
-                 HAVING COALESCE(SUM(sv.final_balance) FILTER (WHERE a.voucher_status = $1), 0) > 0
-                  ORDER BY s.created_at DESC`,
-                [READY_STATUS]
+                `WITH remaining_vouchers AS (
+                    SELECT
+                        la.id AS loading_advance_id,
+                        la.voucher_number,
+                        o.id AS owner_id,
+                        o.owner_name,
+                        o.owner_type,
+                        la.vehicle_registration_number AS vehicle_number,
+                        v.id AS vehicle_id,
+                        COALESCE(
+                            la.sum_ifas,
+                            (SELECT SUM(lai.ifa_amount)
+                             FROM loading_advance_invoices lai
+                             WHERE lai.loading_advance_id = la.id),
+                            0
+                        )::DECIMAL(12,2) AS sum_ifas,
+                        COALESCE(la.commission_pct, 6)::DECIMAL(12,4) AS commission_pct,
+                        la.created_at
+                    FROM acknowledgements a
+                    JOIN loading_advances la ON la.id = a.loading_advance_id
+                    JOIN owners o ON (
+                        o.id = la.owner_id
+                        OR (
+                            la.owner_id IS NULL
+                            AND o.owner_name = la.owner_name
+                            AND o.owner_type = la.owner_type
+                        )
+                    )
+                    JOIN vehicles v ON v.vehicle_no = la.vehicle_registration_number
+                    WHERE a.voucher_status = $1
+                      AND LOWER(TRIM(COALESCE(la.owner_type, ''))) IN ('dedicated', 'market')
+                      AND o.status = 'Active'
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM dedicated_market_settlement_vouchers dmsv
+                          WHERE dmsv.loading_advance_id = la.id
+                      )
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM cashbook_payments cp
+                          WHERE cp.reference_module = 'Dedicated Owner Payable'
+                            AND COALESCE(cp.reference_record_type, 'Settlement') = $2
+                            AND la.id = ANY(COALESCE(cp.reference_loading_advance_ids, ARRAY[]::INTEGER[]))
+                      )
+                )
+                SELECT
+                    MIN(rv.loading_advance_id) AS id,
+                    rv.owner_id,
+                    rv.owner_name,
+                    rv.owner_type,
+                    rv.vehicle_id,
+                    rv.vehicle_number,
+                    SUM(rv.sum_ifas)::DECIMAL(12,2) AS sum_ifas,
+                    SUM(ROUND(rv.sum_ifas - ((rv.sum_ifas * rv.commission_pct) / 100), 2))::DECIMAL(12,2) AS settlement_balance,
+                    MAX(rv.created_at) AS created_at,
+                    FALSE AS settled,
+                    ARRAY[rv.vehicle_id]::INTEGER[] AS vehicle_ids,
+                    COALESCE(string_agg(rv.voucher_number, ', ' ORDER BY rv.voucher_number), '') AS voucher_numbers,
+                    COALESCE(string_agg(rv.vehicle_number, ', ' ORDER BY rv.vehicle_number), '') AS vehicle_numbers,
+                    array_agg(rv.loading_advance_id ORDER BY rv.loading_advance_id) AS reference_loading_advance_ids,
+                    $2::VARCHAR AS reference_record_type
+                FROM remaining_vouchers rv
+                GROUP BY rv.owner_id, rv.owner_name, rv.owner_type, rv.vehicle_id, rv.vehicle_number
+                HAVING SUM(ROUND(rv.sum_ifas - ((rv.sum_ifas * rv.commission_pct) / 100), 2)) > 0
+                ORDER BY MAX(rv.created_at) DESC, rv.vehicle_number ASC`,
+                [READY_STATUS, VEHICLE_GROUP_REFERENCE_TYPE]
             ),
             pool.query(
                 `SELECT
@@ -364,6 +537,7 @@ const createPayment = async (req, res, next) => {
             payment_category,
             reference_category,
             reference_module,
+            reference_record_type,
             reference_record_id,
             amount_paid,
             remarks,
@@ -387,6 +561,12 @@ const createPayment = async (req, res, next) => {
             return res.status(400).json({ success: false, message: 'Invalid reference_module for the selected category' });
         }
 
+        const referenceRecordType = reference_record_type || SETTLEMENT_REFERENCE_TYPE;
+        if (![SETTLEMENT_REFERENCE_TYPE, VEHICLE_GROUP_REFERENCE_TYPE].includes(referenceRecordType)
+            || (referenceRecordType === VEHICLE_GROUP_REFERENCE_TYPE && reference_module !== 'Dedicated Owner Payable')) {
+            return res.status(400).json({ success: false, message: 'Invalid reference_record_type' });
+        }
+
         const referenceId = Number(reference_record_id);
         if (!Number.isInteger(referenceId) || referenceId <= 0) {
             return res.status(400).json({ success: false, message: 'Valid reference_record_id is required' });
@@ -403,21 +583,27 @@ const createPayment = async (req, res, next) => {
         }
 
         const existing = await client.query(
-            'SELECT id FROM cashbook_payments WHERE reference_module = $1 AND reference_record_id = $2',
-            [reference_module, referenceId]
+            `SELECT id
+             FROM cashbook_payments
+             WHERE reference_module = $1
+               AND COALESCE(reference_record_type, $2) = $2
+               AND reference_record_id = $3`,
+            [reference_module, referenceRecordType, referenceId]
         );
         if (existing.rows.length) {
             return res.status(400).json({ success: false, message: 'A payment already exists for the selected reference record' });
         }
 
-        const refInfo = await fetchReferenceInfo(client, reference_module, referenceId);
+        const refInfo = await fetchReferenceInfo(client, reference_module, referenceId, referenceRecordType);
         if (!refInfo) {
             return res.status(400).json({ success: false, message: 'Reference record not found' });
         }
         if (reference_module === 'Due Settlement' && refInfo.due_settled) {
             return res.status(400).json({ success: false, message: 'Selected due settlement is already settled' });
         }
-        if (reference_module === 'Dedicated Owner Payable' && refInfo.settled) {
+        if (reference_module === 'Dedicated Owner Payable'
+            && referenceRecordType === SETTLEMENT_REFERENCE_TYPE
+            && refInfo.settled) {
             return res.status(400).json({ success: false, message: 'Selected dedicated settlement is already settled' });
         }
         if (reference_module === 'Dedicated Owner Payable'
@@ -435,6 +621,10 @@ const createPayment = async (req, res, next) => {
         if (amountPaid > referenceAmount) {
             return res.status(400).json({ success: false, message: 'Amount paid cannot exceed the reference amount' });
         }
+        if (referenceRecordType === VEHICLE_GROUP_REFERENCE_TYPE
+            && Math.round(amountPaid * 100) !== Math.round(referenceAmount * 100)) {
+            return res.status(400).json({ success: false, message: 'The remaining dedicated owner balance must be paid in full' });
+        }
 
         await client.query('BEGIN');
         inTx = true;
@@ -442,8 +632,9 @@ const createPayment = async (req, res, next) => {
         const insertRes = await client.query(
             `INSERT INTO cashbook_payments
                 (payment_date, vehicle_id, vehicle_number, payment_category, reference_category,
-                 reference_module, reference_record_id, amount_paid, remarks, created_by)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+                 reference_module, reference_record_type, reference_record_id,
+                 reference_loading_advance_ids, reference_amount_snapshot, amount_paid, remarks, created_by)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
              RETURNING id`,
             [
                 payment_date,
@@ -452,7 +643,10 @@ const createPayment = async (req, res, next) => {
                 payment_category,
                 reference_category,
                 reference_module,
+                referenceRecordType,
                 referenceId,
+                referenceRecordType === VEHICLE_GROUP_REFERENCE_TYPE ? refInfo.loading_advance_ids : null,
+                referenceRecordType === VEHICLE_GROUP_REFERENCE_TYPE ? referenceAmount : null,
                 Number(amountPaid.toFixed(2)),
                 normalizeText(remarks),
                 created_by || null
@@ -473,7 +667,8 @@ const createPayment = async (req, res, next) => {
             );
         }
 
-        if (reference_module === 'Dedicated Owner Payable') {
+        if (reference_module === 'Dedicated Owner Payable'
+            && referenceRecordType === SETTLEMENT_REFERENCE_TYPE) {
             const shouldSettle = amountPaid >= referenceAmount;
             await client.query(
                 `UPDATE dedicated_market_settlements
@@ -518,6 +713,7 @@ const updatePayment = async (req, res, next) => {
             payment_category,
             reference_category,
             reference_module,
+            reference_record_type,
             reference_record_id,
             amount_paid,
             remarks
@@ -540,6 +736,12 @@ const updatePayment = async (req, res, next) => {
             return res.status(400).json({ success: false, message: 'Invalid reference_module for the selected category' });
         }
 
+        const referenceRecordType = reference_record_type || SETTLEMENT_REFERENCE_TYPE;
+        if (![SETTLEMENT_REFERENCE_TYPE, VEHICLE_GROUP_REFERENCE_TYPE].includes(referenceRecordType)
+            || (referenceRecordType === VEHICLE_GROUP_REFERENCE_TYPE && reference_module !== 'Dedicated Owner Payable')) {
+            return res.status(400).json({ success: false, message: 'Invalid reference_record_type' });
+        }
+
         const referenceId = Number(reference_record_id);
         if (!Number.isInteger(referenceId) || referenceId <= 0) {
             return res.status(400).json({ success: false, message: 'Valid reference_record_id is required' });
@@ -556,14 +758,25 @@ const updatePayment = async (req, res, next) => {
         }
 
         const duplicate = await client.query(
-            'SELECT id FROM cashbook_payments WHERE reference_module = $1 AND reference_record_id = $2 AND id <> $3',
-            [reference_module, referenceId, id]
+            `SELECT id
+             FROM cashbook_payments
+             WHERE reference_module = $1
+               AND COALESCE(reference_record_type, $2) = $2
+               AND reference_record_id = $3
+               AND id <> $4`,
+            [reference_module, referenceRecordType, referenceId, id]
         );
         if (duplicate.rows.length) {
             return res.status(400).json({ success: false, message: 'Another payment already exists for the selected reference record' });
         }
 
-        const refInfo = await fetchReferenceInfo(client, reference_module, referenceId);
+        const refInfo = await fetchReferenceInfo(
+            client,
+            reference_module,
+            referenceId,
+            referenceRecordType,
+            referenceRecordType === VEHICLE_GROUP_REFERENCE_TYPE ? id : null
+        );
         if (!refInfo) {
             return res.status(400).json({ success: false, message: 'Reference record not found' });
         }
@@ -571,6 +784,7 @@ const updatePayment = async (req, res, next) => {
             return res.status(400).json({ success: false, message: 'Selected due settlement is already settled' });
         }
         if (reference_module === 'Dedicated Owner Payable'
+            && referenceRecordType === SETTLEMENT_REFERENCE_TYPE
             && refInfo.settled
             && existingPayment.reference_record_id !== referenceId) {
             return res.status(400).json({ success: false, message: 'Selected dedicated settlement is already settled' });
@@ -590,6 +804,10 @@ const updatePayment = async (req, res, next) => {
         if (amountPaid > referenceAmount) {
             return res.status(400).json({ success: false, message: 'Amount paid cannot exceed the reference amount' });
         }
+        if (referenceRecordType === VEHICLE_GROUP_REFERENCE_TYPE
+            && Math.round(amountPaid * 100) !== Math.round(referenceAmount * 100)) {
+            return res.status(400).json({ success: false, message: 'The remaining dedicated owner balance must be paid in full' });
+        }
 
         await client.query('BEGIN');
         inTx = true;
@@ -606,7 +824,10 @@ const updatePayment = async (req, res, next) => {
         }
 
         if (existingPayment.reference_module === 'Dedicated Owner Payable'
-            && (existingPayment.reference_record_id !== referenceId || reference_module !== 'Dedicated Owner Payable')) {
+            && (existingPayment.reference_record_type || SETTLEMENT_REFERENCE_TYPE) === SETTLEMENT_REFERENCE_TYPE
+            && (existingPayment.reference_record_id !== referenceId
+                || reference_module !== 'Dedicated Owner Payable'
+                || referenceRecordType !== SETTLEMENT_REFERENCE_TYPE)) {
             await client.query(
                 `UPDATE dedicated_market_settlements
                  SET settled = FALSE,
@@ -625,9 +846,12 @@ const updatePayment = async (req, res, next) => {
                  payment_category = $5,
                  reference_category = $6,
                  reference_module = $7,
-                 reference_record_id = $8,
-                 amount_paid = $9,
-                 remarks = $10
+                 reference_record_type = $8,
+                 reference_record_id = $9,
+                 reference_loading_advance_ids = $10,
+                 reference_amount_snapshot = $11,
+                 amount_paid = $12,
+                 remarks = $13
              WHERE id = $1`,
             [
                 id,
@@ -637,7 +861,10 @@ const updatePayment = async (req, res, next) => {
                 payment_category,
                 reference_category,
                 reference_module,
+                referenceRecordType,
                 referenceId,
+                referenceRecordType === VEHICLE_GROUP_REFERENCE_TYPE ? refInfo.loading_advance_ids : null,
+                referenceRecordType === VEHICLE_GROUP_REFERENCE_TYPE ? referenceAmount : null,
                 Number(amountPaid.toFixed(2)),
                 normalizeText(remarks)
             ]
@@ -655,7 +882,8 @@ const updatePayment = async (req, res, next) => {
             );
         }
 
-        if (reference_module === 'Dedicated Owner Payable') {
+        if (reference_module === 'Dedicated Owner Payable'
+            && referenceRecordType === SETTLEMENT_REFERENCE_TYPE) {
             const shouldSettle = amountPaid >= referenceAmount;
             await client.query(
                 `UPDATE dedicated_market_settlements
@@ -708,7 +936,8 @@ const deletePayment = async (req, res, next) => {
             );
         }
 
-        if (existingPayment.reference_module === 'Dedicated Owner Payable') {
+        if (existingPayment.reference_module === 'Dedicated Owner Payable'
+            && (existingPayment.reference_record_type || SETTLEMENT_REFERENCE_TYPE) === SETTLEMENT_REFERENCE_TYPE) {
             await client.query(
                 `UPDATE dedicated_market_settlements
                  SET settled = FALSE,
