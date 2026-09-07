@@ -82,6 +82,7 @@ const CashbookPayments = () => {
     const [payments, setPayments] = useState([]);
     const [vehicles, setVehicles] = useState([]);
     const [driverSalaryPayables, setDriverSalaryPayables] = useState([]);
+    const [ownVehiclePayables, setOwnVehiclePayables] = useState([]);
     const [dedicatedOwnerPayables, setDedicatedOwnerPayables] = useState([]);
     const [dueSettlements, setDueSettlements] = useState([]);
     const [insuranceRecords, setInsuranceRecords] = useState([]);
@@ -115,6 +116,7 @@ const CashbookPayments = () => {
                 const meta = metaRes.data || {};
                 setVehicles(meta.vehicles || []);
                 setDriverSalaryPayables(meta.driver_salary_payables || []);
+                setOwnVehiclePayables(meta.own_vehicle_payables || []);
                 setDedicatedOwnerPayables(meta.dedicated_owner_payables || []);
                 setDueSettlements(meta.due_settlements || []);
                 setInsuranceRecords(meta.insurance_records || []);
@@ -156,12 +158,29 @@ const CashbookPayments = () => {
     const referenceOptions = useMemo(() => {
         let options = [];
         if (formData.reference_module === 'Driver Salary Payable') {
-            options = driverSalaryPayables.map((row) => ({
+            const settledOptions = driverSalaryPayables
+                .filter((row) => !selectedVehicleId || String(row.vehicle_numbers || '')
+                    .split(',')
+                    .map((vehicleNumber) => vehicleNumber.trim())
+                    .includes(selectedVehicleId))
+                .map((row) => ({
                 id: row.id,
                 amount: row.driver_salary_payable,
                 reference_record_type: 'Settlement',
                 label: `Driver ${row.driver_name || 'NA'} | Vehicles: ${row.vehicle_numbers || 'NA'} | Amount ${formatMoney(row.driver_salary_payable)}`
-            }));
+                }));
+            const pendingOptions = ownVehiclePayables
+                .filter((row) => !selectedVehicleId || (
+                    row.vehicle_ids?.length ? row.vehicle_ids : [row.vehicle_id]
+                ).some((id) => String(id || '') === selectedVehicleId))
+                .map((row) => ({
+                    id: row.id,
+                    amount: row.driver_salary_payable,
+                    vehicle_id: row.vehicle_id,
+                    reference_record_type: row.reference_record_type || 'VehicleVoucherGroup',
+                    label: `Driver ${row.driver_name || 'NA'} | Vehicle: ${row.vehicle_number || row.vehicle_numbers || 'NA'} | Vouchers: ${row.voucher_numbers || 'NA'} | Pending ${formatMoney(row.driver_salary_payable)}`
+                }));
+            options = [...settledOptions, ...pendingOptions];
         } else if (formData.reference_module === 'Dedicated Owner Payable') {
             options = dedicatedOwnerPayables
                 .filter((row) => !selectedVehicleId || (
@@ -215,6 +234,7 @@ const CashbookPayments = () => {
         selectedVehicleId,
         formData.reference_record_id,
         driverSalaryPayables,
+        ownVehiclePayables,
         dedicatedOwnerPayables,
         dueSettlements,
         insuranceRecords,
@@ -264,17 +284,32 @@ const CashbookPayments = () => {
         ));
     }, [payments, search]);
 
-    const filteredPendingOwnerPayables = useMemo(() => {
+    const filteredPendingVehiclePayables = useMemo(() => {
         const q = search.trim().toLowerCase();
         if (!q) return [];
 
-        return dedicatedOwnerPayables.filter((row) => (
+        const pendingRows = [
+            ...ownVehiclePayables.map((row) => ({
+                ...row,
+                pending_party: row.driver_name,
+                pending_amount: row.driver_salary_payable,
+                pending_module: 'Driver Salary Payable'
+            })),
+            ...dedicatedOwnerPayables.map((row) => ({
+                ...row,
+                pending_party: row.owner_name,
+                pending_amount: row.settlement_balance,
+                pending_module: 'Dedicated Owner Payable'
+            }))
+        ];
+
+        return pendingRows.filter((row) => (
             String(row.vehicle_number || '').toLowerCase().includes(q)
             || String(row.vehicle_numbers || '').toLowerCase().includes(q)
-            || String(row.owner_name || '').toLowerCase().includes(q)
+            || String(row.pending_party || '').toLowerCase().includes(q)
             || String(row.voucher_numbers || '').toLowerCase().includes(q)
         ));
-    }, [dedicatedOwnerPayables, search]);
+    }, [ownVehiclePayables, dedicatedOwnerPayables, search]);
 
     const startIndex = (currentPage - 1) * itemsPerPage;
     const paginatedItems = filteredPayments.slice(startIndex, startIndex + itemsPerPage);
@@ -361,7 +396,7 @@ const CashbookPayments = () => {
             const ref = referenceOptions.find((opt) => String(opt.id) === String(value));
             if (ref) {
                 next.reference_record_type = ref.reference_record_type || 'Settlement';
-                if (!next.amount_paid) next.amount_paid = String(ref.amount ?? '');
+                next.amount_paid = String(ref.amount ?? '');
                 if (ref.vehicle_id) next.vehicle_id = String(ref.vehicle_id);
             }
             return next;
@@ -496,10 +531,10 @@ const CashbookPayments = () => {
                         </div>
                     </div>
 
-                    {filteredPendingOwnerPayables.length > 0 && (
+                    {filteredPendingVehiclePayables.length > 0 && (
                         <div className="rounded-md border border-amber-200 bg-amber-50/60 overflow-hidden">
                             <div className="px-4 py-3 border-b border-amber-200">
-                                <div className="font-semibold text-amber-900">Pending owner balance</div>
+                                <div className="font-semibold text-amber-900">Pending vehicle balance</div>
                                 <div className="text-xs text-amber-700">
                                     Remaining ready vouchers for the searched vehicle, excluding balance-settled and already-paid vouchers.
                                 </div>
@@ -507,20 +542,22 @@ const CashbookPayments = () => {
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead className="font-bold text-slate-700">Owner</TableHead>
+                                        <TableHead className="font-bold text-slate-700">Driver / Owner</TableHead>
                                         <TableHead className="font-bold text-slate-700">Vehicle</TableHead>
                                         <TableHead className="font-bold text-slate-700">Vouchers</TableHead>
                                         <TableHead className="font-bold text-slate-700">Pending Amount</TableHead>
+                                        <TableHead className="font-bold text-slate-700">Type</TableHead>
                                         <TableHead className="font-bold text-slate-700">Status</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {filteredPendingOwnerPayables.map((row) => (
-                                        <TableRow key={`pending-${row.owner_id || row.owner_name}-${row.vehicle_id || row.vehicle_number}`}>
-                                            <TableCell className="font-medium">{row.owner_name || '-'}</TableCell>
+                                    {filteredPendingVehiclePayables.map((row) => (
+                                        <TableRow key={`pending-${row.pending_module}-${row.driver_id || row.owner_id || row.pending_party}-${row.vehicle_id || row.vehicle_number}`}>
+                                            <TableCell className="font-medium">{row.pending_party || '-'}</TableCell>
                                             <TableCell className="font-medium">{row.vehicle_number || row.vehicle_numbers || '-'}</TableCell>
                                             <TableCell className="text-xs">{row.voucher_numbers || '-'}</TableCell>
-                                            <TableCell className="font-semibold text-amber-900">{formatMoney(row.settlement_balance)}</TableCell>
+                                            <TableCell className="font-semibold text-amber-900">{formatMoney(row.pending_amount)}</TableCell>
+                                            <TableCell className="text-xs">{row.pending_module === 'Driver Salary Payable' ? 'Own Vehicle' : 'Dedicated / Market'}</TableCell>
                                             <TableCell>
                                                 <Badge className="border-none bg-amber-100 text-amber-700">Pending</Badge>
                                             </TableCell>
@@ -531,7 +568,7 @@ const CashbookPayments = () => {
                         </div>
                     )}
 
-                    {filteredPayments.length === 0 && filteredPendingOwnerPayables.length === 0 ? (
+                    {filteredPayments.length === 0 && filteredPendingVehiclePayables.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-12 text-slate-400">
                             <div className="bg-slate-50 p-6 rounded-full mb-4">
                                 <SearchX className="w-12 h-12 text-slate-300" />

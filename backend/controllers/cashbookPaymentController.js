@@ -128,6 +128,84 @@ const fetchDedicatedVehicleGroupInfo = async (client, anchorLoadingAdvanceId, ex
     };
 };
 
+const fetchOwnVehicleGroupInfo = async (client, anchorLoadingAdvanceId, excludePaymentId = null) => {
+    const anchorRes = await client.query(
+        `SELECT id, driver_id, driver_name, vehicle_registration_number
+         FROM loading_advances
+         WHERE id = $1`,
+        [anchorLoadingAdvanceId]
+    );
+    const anchor = anchorRes.rows[0];
+    if (!anchor) return null;
+
+    const driverRes = await client.query(
+        `SELECT id, driver_name
+         FROM drivers
+         WHERE driver_status = TRUE
+           AND (id = $1 OR ($1::INT IS NULL AND driver_name = $2))`,
+        [anchor.driver_id, anchor.driver_name]
+    );
+    const driver = driverRes.rows[0];
+    if (!driver) return null;
+
+    const result = await client.query(
+        `SELECT
+            la.id AS loading_advance_id,
+            a.voucher_number,
+            la.vehicle_registration_number AS vehicle_number,
+            v.id AS vehicle_id,
+            (
+                COALESCE(la.driver_loading_advance, 0)
+                - COALESCE(la.driver_bata, 0)
+                - COALESCE(la.unloading, 0)
+                - COALESCE(la.tarpaulin, 0)
+                - COALESCE(la.city_tax, 0)
+                - COALESCE(la.maintenance, 0)
+            )::DECIMAL(12,2) AS driver_balance
+         FROM acknowledgements a
+         JOIN loading_advances la ON la.id = a.loading_advance_id
+         JOIN vehicles v ON v.vehicle_no = la.vehicle_registration_number
+         WHERE a.voucher_status = $1
+           AND LOWER(TRIM(COALESCE(la.owner_type, ''))) = 'own'
+           AND la.vehicle_registration_number = $2
+           AND (la.driver_id = $3 OR (la.driver_id IS NULL AND la.driver_name = $4))
+           AND NOT EXISTS (
+               SELECT 1
+               FROM own_vehicle_settlement_vouchers ovsv
+               WHERE ovsv.loading_advance_id = la.id
+           )
+           AND NOT EXISTS (
+               SELECT 1
+               FROM cashbook_payments cp
+               WHERE cp.reference_module = 'Driver Salary Payable'
+                 AND COALESCE(cp.reference_record_type, $5) = $5
+                 AND ($6::INT IS NULL OR cp.id <> $6)
+                 AND la.id = ANY(COALESCE(cp.reference_loading_advance_ids, ARRAY[]::INTEGER[]))
+           )
+         ORDER BY la.id ASC`,
+        [READY_STATUS, anchor.vehicle_registration_number, driver.id, driver.driver_name, VEHICLE_GROUP_REFERENCE_TYPE, excludePaymentId]
+    );
+
+    if (result.rows.length === 0) return null;
+
+    const amount = Number(Math.max(
+        result.rows.reduce((sum, row) => sum + toNumber(row.driver_balance, 0), 0),
+        0
+    ).toFixed(2));
+    const vehicleIds = [...new Set(result.rows.map(row => Number(row.vehicle_id)).filter(Number.isInteger))];
+
+    return {
+        amount,
+        label: driver.driver_name || anchor.driver_name || null,
+        vehicle_id: vehicleIds.length === 1 ? vehicleIds[0] : null,
+        vehicle_ids: vehicleIds,
+        vehicle_numbers: anchor.vehicle_registration_number || null,
+        loading_advance_ids: result.rows.map(row => Number(row.loading_advance_id)),
+        voucher_numbers: result.rows.map(row => row.voucher_number).filter(Boolean).join(', '),
+        settled: false
+    };
+};
+
 const fetchReferenceInfo = async (
     client,
     referenceModule,
@@ -137,6 +215,10 @@ const fetchReferenceInfo = async (
 ) => {
     switch (referenceModule) {
         case 'Driver Salary Payable': {
+            if (referenceRecordType === VEHICLE_GROUP_REFERENCE_TYPE) {
+                return fetchOwnVehicleGroupInfo(client, referenceRecordId, excludePaymentId);
+            }
+
             const result = await client.query(
                 `SELECT
                     s.id,
@@ -290,7 +372,7 @@ const PAYMENT_SELECT = `
         p.*,
         COALESCE(v.vehicle_no, p.vehicle_number) AS vehicle_number_display,
         CASE
-            WHEN p.reference_module = 'Dedicated Owner Payable'
+            WHEN p.reference_module IN ('Driver Salary Payable', 'Dedicated Owner Payable')
                 AND COALESCE(p.reference_record_type, 'Settlement') = 'VehicleVoucherGroup'
                 THEN p.reference_amount_snapshot
             WHEN p.reference_module = 'Driver Salary Payable' THEN ovs.driver_salary_payable
@@ -300,9 +382,12 @@ const PAYMENT_SELECT = `
             ELSE NULL
         END AS reference_amount,
         CASE
-            WHEN p.reference_module = 'Dedicated Owner Payable'
+            WHEN p.reference_module IN ('Driver Salary Payable', 'Dedicated Owner Payable')
                 AND COALESCE(p.reference_record_type, 'Settlement') = 'VehicleVoucherGroup'
-                THEN dmp.owner_name
+                THEN CASE
+                    WHEN p.reference_module = 'Driver Salary Payable' THEN vgp.driver_name
+                    ELSE vgp.owner_name
+                END
             WHEN p.reference_module = 'Driver Salary Payable' THEN ovs.driver_name
             WHEN p.reference_module = 'Dedicated Owner Payable' THEN dms.owner_name
             WHEN p.reference_module = 'Due Settlement' THEN COALESCE(v2.vehicle_no, lm.vehicle_number)
@@ -310,9 +395,9 @@ const PAYMENT_SELECT = `
             ELSE NULL
         END AS reference_party,
         CASE
-            WHEN p.reference_module = 'Dedicated Owner Payable'
+            WHEN p.reference_module IN ('Driver Salary Payable', 'Dedicated Owner Payable')
                 AND COALESCE(p.reference_record_type, 'Settlement') = 'VehicleVoucherGroup'
-                THEN dmp.vehicle_numbers
+                THEN vgp.vehicle_numbers
             WHEN p.reference_module = 'Driver Salary Payable' THEN ovs.vehicle_numbers
             WHEN p.reference_module = 'Dedicated Owner Payable' THEN dms.vehicle_numbers
             ELSE NULL
@@ -354,15 +439,16 @@ const PAYMENT_SELECT = `
     LEFT JOIN (
         SELECT
             cp.id AS payment_id,
+            MAX(la.driver_name) AS driver_name,
             MAX(la.owner_name) AS owner_name,
             COALESCE(string_agg(DISTINCT la.vehicle_registration_number, ', ' ORDER BY la.vehicle_registration_number), '') AS vehicle_numbers
         FROM cashbook_payments cp
         JOIN loading_advances la
             ON la.id = ANY(COALESCE(cp.reference_loading_advance_ids, ARRAY[]::INTEGER[]))
-        WHERE cp.reference_module = 'Dedicated Owner Payable'
+        WHERE cp.reference_module IN ('Driver Salary Payable', 'Dedicated Owner Payable')
           AND COALESCE(cp.reference_record_type, 'Settlement') = 'VehicleVoucherGroup'
         GROUP BY cp.id
-    ) dmp ON p.id = dmp.payment_id
+    ) vgp ON p.id = vgp.payment_id
     LEFT JOIN loan_repayment_trackings lrt ON p.reference_module = 'Due Settlement' AND p.reference_record_id = lrt.id
     LEFT JOIN loan_masters lm ON lrt.loan_master_id = lm.id
     LEFT JOIN vehicles v2 ON lm.vehicle_id = v2.id
@@ -377,7 +463,7 @@ const fetchPaymentById = async (client, id) => {
 
 const getCashbookMeta = async (req, res, next) => {
     try {
-        const [vehiclesRes, driverPayableRes, ownerPayableRes, dueSettlementRes, insuranceRes] = await Promise.all([
+        const [vehiclesRes, driverPayableRes, ownVehiclePayableRes, ownerPayableRes, dueSettlementRes, insuranceRes] = await Promise.all([
             pool.query(
                 `SELECT
                     id,
@@ -397,6 +483,70 @@ const getCashbookMeta = async (req, res, next) => {
                  LEFT JOIN own_vehicle_settlement_vouchers sv ON sv.settlement_id = s.id
                  GROUP BY s.id
                  ORDER BY s.created_at DESC`
+            ),
+            pool.query(
+                `WITH remaining_vouchers AS (
+                    SELECT
+                        la.id AS loading_advance_id,
+                        a.voucher_number,
+                        d.id AS driver_id,
+                        d.driver_name,
+                        la.vehicle_registration_number AS vehicle_number,
+                        v.id AS vehicle_id,
+                        (
+                            COALESCE(la.driver_loading_advance, 0)
+                            - COALESCE(la.driver_bata, 0)
+                            - COALESCE(la.unloading, 0)
+                            - COALESCE(la.tarpaulin, 0)
+                            - COALESCE(la.city_tax, 0)
+                            - COALESCE(la.maintenance, 0)
+                        )::DECIMAL(12,2) AS driver_balance,
+                        la.created_at
+                    FROM acknowledgements a
+                    JOIN loading_advances la ON la.id = a.loading_advance_id
+                    JOIN drivers d ON (
+                        d.id = la.driver_id
+                        OR (
+                            la.driver_id IS NULL
+                            AND d.driver_name = la.driver_name
+                        )
+                    )
+                    JOIN vehicles v ON v.vehicle_no = la.vehicle_registration_number
+                    WHERE a.voucher_status = $1
+                      AND LOWER(TRIM(COALESCE(la.owner_type, ''))) = 'own'
+                      AND d.driver_status = TRUE
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM own_vehicle_settlement_vouchers ovsv
+                          WHERE ovsv.loading_advance_id = la.id
+                      )
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM cashbook_payments cp
+                          WHERE cp.reference_module = 'Driver Salary Payable'
+                            AND COALESCE(cp.reference_record_type, 'Settlement') = $2
+                            AND la.id = ANY(COALESCE(cp.reference_loading_advance_ids, ARRAY[]::INTEGER[]))
+                      )
+                )
+                SELECT
+                    MIN(rv.loading_advance_id) AS id,
+                    rv.driver_id,
+                    rv.driver_name,
+                    rv.vehicle_id,
+                    rv.vehicle_number,
+                    GREATEST(SUM(rv.driver_balance), 0)::DECIMAL(12,2) AS driver_salary_payable,
+                    MAX(rv.created_at) AS created_at,
+                    FALSE AS settled,
+                    ARRAY[rv.vehicle_id]::INTEGER[] AS vehicle_ids,
+                    COALESCE(string_agg(rv.voucher_number, ', ' ORDER BY rv.voucher_number), '') AS voucher_numbers,
+                    COALESCE(string_agg(rv.vehicle_number, ', ' ORDER BY rv.vehicle_number), '') AS vehicle_numbers,
+                    array_agg(rv.loading_advance_id ORDER BY rv.loading_advance_id) AS reference_loading_advance_ids,
+                    $2::VARCHAR AS reference_record_type
+                FROM remaining_vouchers rv
+                GROUP BY rv.driver_id, rv.driver_name, rv.vehicle_id, rv.vehicle_number
+                HAVING GREATEST(SUM(rv.driver_balance), 0) > 0
+                ORDER BY MAX(rv.created_at) DESC, rv.vehicle_number ASC`,
+                [READY_STATUS, VEHICLE_GROUP_REFERENCE_TYPE]
             ),
             pool.query(
                 `WITH remaining_vouchers AS (
@@ -494,6 +644,7 @@ const getCashbookMeta = async (req, res, next) => {
             data: {
                 vehicles: vehiclesRes.rows || [],
                 driver_salary_payables: driverPayableRes.rows || [],
+                own_vehicle_payables: ownVehiclePayableRes.rows || [],
                 dedicated_owner_payables: ownerPayableRes.rows || [],
                 due_settlements: dueSettlementRes.rows || [],
                 insurance_records: insuranceRes.rows || []
@@ -563,7 +714,8 @@ const createPayment = async (req, res, next) => {
 
         const referenceRecordType = reference_record_type || SETTLEMENT_REFERENCE_TYPE;
         if (![SETTLEMENT_REFERENCE_TYPE, VEHICLE_GROUP_REFERENCE_TYPE].includes(referenceRecordType)
-            || (referenceRecordType === VEHICLE_GROUP_REFERENCE_TYPE && reference_module !== 'Dedicated Owner Payable')) {
+            || (referenceRecordType === VEHICLE_GROUP_REFERENCE_TYPE
+                && !['Driver Salary Payable', 'Dedicated Owner Payable'].includes(reference_module))) {
             return res.status(400).json({ success: false, message: 'Invalid reference_record_type' });
         }
 
@@ -623,7 +775,7 @@ const createPayment = async (req, res, next) => {
         }
         if (referenceRecordType === VEHICLE_GROUP_REFERENCE_TYPE
             && Math.round(amountPaid * 100) !== Math.round(referenceAmount * 100)) {
-            return res.status(400).json({ success: false, message: 'The remaining dedicated owner balance must be paid in full' });
+            return res.status(400).json({ success: false, message: 'The remaining vehicle balance must be paid in full' });
         }
 
         await client.query('BEGIN');
@@ -738,7 +890,8 @@ const updatePayment = async (req, res, next) => {
 
         const referenceRecordType = reference_record_type || SETTLEMENT_REFERENCE_TYPE;
         if (![SETTLEMENT_REFERENCE_TYPE, VEHICLE_GROUP_REFERENCE_TYPE].includes(referenceRecordType)
-            || (referenceRecordType === VEHICLE_GROUP_REFERENCE_TYPE && reference_module !== 'Dedicated Owner Payable')) {
+            || (referenceRecordType === VEHICLE_GROUP_REFERENCE_TYPE
+                && !['Driver Salary Payable', 'Dedicated Owner Payable'].includes(reference_module))) {
             return res.status(400).json({ success: false, message: 'Invalid reference_record_type' });
         }
 
@@ -806,7 +959,7 @@ const updatePayment = async (req, res, next) => {
         }
         if (referenceRecordType === VEHICLE_GROUP_REFERENCE_TYPE
             && Math.round(amountPaid * 100) !== Math.round(referenceAmount * 100)) {
-            return res.status(400).json({ success: false, message: 'The remaining dedicated owner balance must be paid in full' });
+            return res.status(400).json({ success: false, message: 'The remaining vehicle balance must be paid in full' });
         }
 
         await client.query('BEGIN');
