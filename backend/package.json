@@ -4,10 +4,10 @@
     "description": "Transport System Management - Backend API",
     "main": "server.js",
     "scripts": {
-        "start": "node server.js",
+        "start": "npm run db:patch && node server.js",
         "db:patch": "node scripts/applyDbPatches.js",
         "dev": "set PORT=5001 && npm run db:patch && nodemon server.js",
-        "test": "echo \"Error: no test specified\" && exit 1"
+        "test": "node --test test/*.test.js"
     },
     "keywords": [
         "express",

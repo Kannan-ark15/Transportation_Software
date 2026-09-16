@@ -151,6 +151,13 @@ const getReadyVouchers = async (req, res, next) => {
                         AND ($2::INT IS NULL OR d.id = $2)
                )
                AND ($3::TEXT IS NULL OR la.vehicle_registration_number = $3)
+               AND NOT EXISTS (
+                    SELECT 1
+                    FROM cashbook_payments cp
+                    WHERE cp.reference_module = 'Driver Salary Payable'
+                      AND COALESCE(cp.reference_record_type, 'Settlement') = 'VehicleVoucherGroup'
+                      AND la.id = ANY(COALESCE(cp.reference_loading_advance_ids, ARRAY[]::INTEGER[]))
+               )
              ORDER BY la.vehicle_registration_number ASC, a.voucher_number ASC`,
             [READY_STATUS, driverId, vehicleNumber || null]
         );
@@ -372,8 +379,8 @@ const createSettlement = async (req, res, next) => {
         const settlementRes = await client.query(
             `INSERT INTO own_vehicle_settlements
                 (driver_id, driver_name, cash_bank, bank_name, branch, account_number, ifsc_code,
-                 total_driver_bata, total_driver_balance, pending_advance, driver_salary_payable, settled)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+                 total_driver_bata, total_driver_balance, pending_advance, driver_salary_payable, settled, settled_at)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
              RETURNING *`,
             [
                 driver.id,
@@ -387,7 +394,8 @@ const createSettlement = async (req, res, next) => {
                 roundedTotalDriverBalance,
                 pendingAdvance,
                 driverSalaryPayable,
-                true
+                false,
+                null
             ]
         );
 

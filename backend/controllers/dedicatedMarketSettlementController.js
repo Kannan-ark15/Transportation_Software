@@ -56,6 +56,13 @@ const getReadyVouchers = async (req, res, next) => {
                AND dmsv.id IS NULL
                AND ($2::INT IS NULL OR o.id = $2)
                AND ($3::TEXT IS NULL OR la.vehicle_registration_number = $3)
+               AND NOT EXISTS (
+                    SELECT 1
+                    FROM cashbook_payments cp
+                    WHERE cp.reference_module = 'Dedicated Owner Payable'
+                      AND COALESCE(cp.reference_record_type, 'Settlement') = 'VehicleVoucherGroup'
+                      AND la.id = ANY(COALESCE(cp.reference_loading_advance_ids, ARRAY[]::INTEGER[]))
+               )
              ORDER BY la.vehicle_registration_number ASC, a.voucher_number ASC`,
             [READY_STATUS, ownerId, vehicleNumber || null]
         );

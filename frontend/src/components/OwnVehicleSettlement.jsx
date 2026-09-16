@@ -626,6 +626,7 @@ const OwnVehicleSettlement = () => {
                                         <TableHead>Total Driver Balance</TableHead>
                                         <TableHead>Pending Advance</TableHead>
                                         <TableHead>Driver Salary Payable</TableHead>
+                                        <TableHead>Status</TableHead>
                                         <TableHead>Settled Date</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -645,6 +646,13 @@ const OwnVehicleSettlement = () => {
                                             <TableCell>{toNumber(row.total_driver_balance).toFixed(2)}</TableCell>
                                             <TableCell>{toNumber(row.pending_advance).toFixed(2)}</TableCell>
                                             <TableCell>{toNumber(row.driver_salary_payable).toFixed(2)}</TableCell>
+                                            <TableCell>
+                                                <Badge className={row.settled
+                                                    ? 'bg-green-100 text-green-700 border-none'
+                                                    : 'bg-amber-100 text-amber-700 border-none'}>
+                                                    {row.settled ? 'Settled' : 'Pending Payment'}
+                                                </Badge>
+                                            </TableCell>
                                             <TableCell>{row.settled_at ? new Date(row.settled_at).toLocaleDateString() : '-'}</TableCell>
                                         </TableRow>
                                     ))}

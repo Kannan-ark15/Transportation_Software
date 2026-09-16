@@ -224,6 +224,7 @@ const fetchReferenceInfo = async (
                     s.id,
                     s.driver_name,
                     s.driver_salary_payable,
+                    s.settled,
                     COALESCE(string_agg(DISTINCT sv.vehicle_number, ', ' ORDER BY sv.vehicle_number), '') AS vehicle_numbers
                  FROM own_vehicle_settlements s
                  LEFT JOIN own_vehicle_settlement_vouchers sv ON sv.settlement_id = s.id
@@ -236,7 +237,8 @@ const fetchReferenceInfo = async (
             return {
                 amount: toNumber(row.driver_salary_payable, 0),
                 label: row.driver_name || null,
-                vehicle_numbers: row.vehicle_numbers || null
+                vehicle_numbers: row.vehicle_numbers || null,
+                settled: row.settled === true
             };
         }
         case 'Dedicated Owner Payable': {
@@ -321,6 +323,71 @@ const fetchReferenceInfo = async (
         }
         default:
             return null;
+    }
+};
+
+const syncBalanceSettlementPaymentStatus = async (
+    client,
+    referenceModule,
+    referenceRecordType,
+    referenceRecordId,
+    amountPaid,
+    referenceAmount
+) => {
+    if (referenceRecordType !== SETTLEMENT_REFERENCE_TYPE) return;
+
+    const shouldSettle = amountPaid >= referenceAmount;
+    if (referenceModule === 'Driver Salary Payable') {
+        await client.query(
+            `UPDATE own_vehicle_settlements
+             SET settled = $2,
+                 settled_at = CASE WHEN $2 THEN CURRENT_TIMESTAMP ELSE NULL END,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = $1`,
+            [referenceRecordId, shouldSettle]
+        );
+    }
+
+    if (referenceModule === 'Dedicated Owner Payable') {
+        await client.query(
+            `UPDATE dedicated_market_settlements
+             SET settled = $2,
+                 settled_at = CASE WHEN $2 THEN CURRENT_TIMESTAMP ELSE NULL END,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = $1`,
+            [referenceRecordId, shouldSettle]
+        );
+    }
+};
+
+const resetBalanceSettlementPaymentStatus = async (
+    client,
+    referenceModule,
+    referenceRecordType,
+    referenceRecordId
+) => {
+    if (referenceRecordType !== SETTLEMENT_REFERENCE_TYPE) return;
+
+    if (referenceModule === 'Driver Salary Payable') {
+        await client.query(
+            `UPDATE own_vehicle_settlements
+             SET settled = FALSE,
+                 settled_at = NULL,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = $1`,
+            [referenceRecordId]
+        );
+    }
+
+    if (referenceModule === 'Dedicated Owner Payable') {
+        await client.query(
+            `UPDATE dedicated_market_settlements
+             SET settled = FALSE,
+                 settled_at = NULL,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = $1`,
+            [referenceRecordId]
+        );
     }
 };
 
@@ -758,6 +825,11 @@ const createPayment = async (req, res, next) => {
             && refInfo.settled) {
             return res.status(400).json({ success: false, message: 'Selected dedicated settlement is already settled' });
         }
+        if (reference_module === 'Driver Salary Payable'
+            && referenceRecordType === SETTLEMENT_REFERENCE_TYPE
+            && refInfo.settled) {
+            return res.status(400).json({ success: false, message: 'Selected own vehicle settlement is already settled' });
+        }
         if (reference_module === 'Dedicated Owner Payable'
             && (!refInfo.vehicle_ids?.length || !refInfo.vehicle_ids.some(id => Number(id) === vehicleId))) {
             return res.status(400).json({ success: false, message: 'Selected vehicle does not match the dedicated settlement' });
@@ -819,18 +891,14 @@ const createPayment = async (req, res, next) => {
             );
         }
 
-        if (reference_module === 'Dedicated Owner Payable'
-            && referenceRecordType === SETTLEMENT_REFERENCE_TYPE) {
-            const shouldSettle = amountPaid >= referenceAmount;
-            await client.query(
-                `UPDATE dedicated_market_settlements
-                 SET settled = $2,
-                     settled_at = CASE WHEN $2 THEN CURRENT_TIMESTAMP ELSE NULL END,
-                     updated_at = CURRENT_TIMESTAMP
-                 WHERE id = $1`,
-                [referenceId, shouldSettle]
-            );
-        }
+        await syncBalanceSettlementPaymentStatus(
+            client,
+            reference_module,
+            referenceRecordType,
+            referenceId,
+            amountPaid,
+            referenceAmount
+        );
 
         await client.query('COMMIT');
         inTx = false;
@@ -942,6 +1010,12 @@ const updatePayment = async (req, res, next) => {
             && existingPayment.reference_record_id !== referenceId) {
             return res.status(400).json({ success: false, message: 'Selected dedicated settlement is already settled' });
         }
+        if (reference_module === 'Driver Salary Payable'
+            && referenceRecordType === SETTLEMENT_REFERENCE_TYPE
+            && refInfo.settled
+            && existingPayment.reference_record_id !== referenceId) {
+            return res.status(400).json({ success: false, message: 'Selected own vehicle settlement is already settled' });
+        }
         if (reference_module === 'Dedicated Owner Payable'
             && (!refInfo.vehicle_ids?.length || !refInfo.vehicle_ids.some(vehicleReferenceId => Number(vehicleReferenceId) === vehicleId))) {
             return res.status(400).json({ success: false, message: 'Selected vehicle does not match the dedicated settlement' });
@@ -976,18 +1050,16 @@ const updatePayment = async (req, res, next) => {
             );
         }
 
-        if (existingPayment.reference_module === 'Dedicated Owner Payable'
-            && (existingPayment.reference_record_type || SETTLEMENT_REFERENCE_TYPE) === SETTLEMENT_REFERENCE_TYPE
+        const existingReferenceType = existingPayment.reference_record_type || SETTLEMENT_REFERENCE_TYPE;
+        if (existingReferenceType === SETTLEMENT_REFERENCE_TYPE
             && (existingPayment.reference_record_id !== referenceId
-                || reference_module !== 'Dedicated Owner Payable'
+                || existingPayment.reference_module !== reference_module
                 || referenceRecordType !== SETTLEMENT_REFERENCE_TYPE)) {
-            await client.query(
-                `UPDATE dedicated_market_settlements
-                 SET settled = FALSE,
-                     settled_at = NULL,
-                     updated_at = CURRENT_TIMESTAMP
-                 WHERE id = $1`,
-                [existingPayment.reference_record_id]
+            await resetBalanceSettlementPaymentStatus(
+                client,
+                existingPayment.reference_module,
+                existingReferenceType,
+                existingPayment.reference_record_id
             );
         }
 
@@ -1035,18 +1107,14 @@ const updatePayment = async (req, res, next) => {
             );
         }
 
-        if (reference_module === 'Dedicated Owner Payable'
-            && referenceRecordType === SETTLEMENT_REFERENCE_TYPE) {
-            const shouldSettle = amountPaid >= referenceAmount;
-            await client.query(
-                `UPDATE dedicated_market_settlements
-                 SET settled = $2,
-                     settled_at = CASE WHEN $2 THEN CURRENT_TIMESTAMP ELSE NULL END,
-                     updated_at = CURRENT_TIMESTAMP
-                 WHERE id = $1`,
-                [referenceId, shouldSettle]
-            );
-        }
+        await syncBalanceSettlementPaymentStatus(
+            client,
+            reference_module,
+            referenceRecordType,
+            referenceId,
+            amountPaid,
+            referenceAmount
+        );
 
         await client.query('COMMIT');
         inTx = false;
@@ -1089,17 +1157,12 @@ const deletePayment = async (req, res, next) => {
             );
         }
 
-        if (existingPayment.reference_module === 'Dedicated Owner Payable'
-            && (existingPayment.reference_record_type || SETTLEMENT_REFERENCE_TYPE) === SETTLEMENT_REFERENCE_TYPE) {
-            await client.query(
-                `UPDATE dedicated_market_settlements
-                 SET settled = FALSE,
-                     settled_at = NULL,
-                     updated_at = CURRENT_TIMESTAMP
-                 WHERE id = $1`,
-                [existingPayment.reference_record_id]
-            );
-        }
+        await resetBalanceSettlementPaymentStatus(
+            client,
+            existingPayment.reference_module,
+            existingPayment.reference_record_type || SETTLEMENT_REFERENCE_TYPE,
+            existingPayment.reference_record_id
+        );
 
         await client.query('DELETE FROM cashbook_payments WHERE id = $1', [id]);
 
