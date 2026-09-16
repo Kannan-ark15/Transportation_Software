@@ -60,6 +60,6 @@ ALTER TABLE IF EXISTS vehicles
             AND insurance_base_value IS NOT NULL
             AND insurance_amount IS NOT NULL
         )
-    );
+    ) NOT VALID;
 
 COMMIT;
