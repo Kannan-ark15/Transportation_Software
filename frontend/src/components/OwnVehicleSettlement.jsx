@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Loader2, WalletCards, SearchX, CheckCircle2 } from 'lucide-react';
+import SettlementConfirmationDialog from './SettlementConfirmationDialog';
 
 const ALL_VEHICLES = '__ALL_VEHICLES__';
 
@@ -35,6 +36,7 @@ const OwnVehicleSettlement = () => {
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
     const [successMsg, setSuccessMsg] = useState('');
+    const [confirmationOpen, setConfirmationOpen] = useState(false);
     const [driverSearch, setDriverSearch] = useState('');
     const [voucherSearch, setVoucherSearch] = useState('');
     const [fromDate, setFromDate] = useState('');
@@ -66,6 +68,9 @@ const OwnVehicleSettlement = () => {
         () => readyVouchers.filter(v => selectedVoucherIds.includes(v.acknowledgement_id)),
         [readyVouchers, selectedVoucherIds]
     );
+
+    const allReadyVouchersSelected = readyVouchers.length > 0
+        && readyVouchers.every(v => selectedVoucherIds.includes(v.acknowledgement_id));
 
     const getManualFields = (ackId) => manualFieldsByAck[ackId] || defaultManualFields;
 
@@ -184,6 +189,14 @@ const OwnVehicleSettlement = () => {
         );
     };
 
+    const toggleAllReadyVouchers = () => {
+        const readyIds = readyVouchers.map(v => v.acknowledgement_id);
+        setSelectedVoucherIds(prev => allReadyVouchersSelected
+            ? prev.filter(id => !readyIds.includes(id))
+            : [...new Set([...prev, ...readyIds])]
+        );
+    };
+
     const updateManualField = (ackId, field, value) => {
         setManualFieldsByAck(prev => ({
             ...prev,
@@ -280,6 +293,7 @@ const OwnVehicleSettlement = () => {
 
             const res = await ownVehicleSettlementAPI.create(payload);
             if (res.success) {
+                setConfirmationOpen(false);
                 setSuccessMsg('Own vehicle settlement saved successfully');
                 await loadReadyVouchers(form.driver_id, form.vehicle_number || null);
                 await loadSettlements();
@@ -291,6 +305,16 @@ const OwnVehicleSettlement = () => {
         } finally {
             setSubmitting(false);
         }
+    };
+
+    const openConfirmation = () => {
+        setError('');
+        const validationMessage = validate();
+        if (validationMessage) {
+            setError(validationMessage);
+            return;
+        }
+        setConfirmationOpen(true);
     };
 
     const settlementVoucherOptions = useMemo(() => {
@@ -420,7 +444,18 @@ const OwnVehicleSettlement = () => {
                             <Table>
                                 <TableHeader className="bg-slate-50/60">
                                     <TableRow>
-                                        <TableHead>Select</TableHead>
+                                        <TableHead>
+                                            <label className="flex items-center gap-2 whitespace-nowrap">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={allReadyVouchersSelected}
+                                                    onChange={toggleAllReadyVouchers}
+                                                    disabled={readyVouchers.length === 0}
+                                                    aria-label="Select all ready vouchers"
+                                                />
+                                                <span>Select all</span>
+                                            </label>
+                                        </TableHead>
                                         <TableHead>Vehicle Number</TableHead>
                                         <TableHead>Voucher Number</TableHead>
                                         <TableHead>Voucher Date</TableHead>
@@ -562,15 +597,34 @@ const OwnVehicleSettlement = () => {
                         </div>
 
                         <div className="flex justify-end">
-                            <Button onClick={handleSettled} disabled={submitting || !form.driver_id}>
-                                {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                            <Button onClick={openConfirmation} disabled={submitting || !form.driver_id}>
                                 <CheckCircle2 className="w-4 h-4 mr-2" />
-                                Settled
+                                Ready for settlement
                             </Button>
                         </div>
                     </div>
                 </CardContent>
             </Card>
+
+            <SettlementConfirmationDialog
+                open={confirmationOpen}
+                onOpenChange={setConfirmationOpen}
+                partyLabel="Driver"
+                partyName={selectedDriver?.driver_name}
+                cashBank={form.cash_bank}
+                onCashBankChange={onCashBankChange}
+                bankDetails={{
+                    bank_name: form.bank_name,
+                    branch: form.branch,
+                    account_number: form.account_number,
+                    ifsc_code: form.ifsc_code
+                }}
+                selectedVouchers={selectedVouchers}
+                amount={driverSalaryPayable}
+                amountLabel="Total Amount to be Settled"
+                submitting={submitting}
+                onConfirm={handleSettled}
+            />
 
             <Card className="border-none shadow-md">
                 <CardHeader className="border-b border-slate-100 pb-4">

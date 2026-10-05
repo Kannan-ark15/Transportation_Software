@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Loader2, CircleDollarSign, SearchX, CheckCircle2 } from 'lucide-react';
+import SettlementConfirmationDialog from './SettlementConfirmationDialog';
 
 const DEFAULT_COMMISSION_PERCENT = 6;
 
@@ -21,6 +22,7 @@ const DedicatedMarketSettlement = () => {
     const [error, setError] = useState('');
     const [successMsg, setSuccessMsg] = useState('');
     const [search, setSearch] = useState('');
+    const [confirmationOpen, setConfirmationOpen] = useState(false);
 
     const [form, setForm] = useState({
         owner_id: '',
@@ -54,6 +56,9 @@ const DedicatedMarketSettlement = () => {
         () => readyVouchers.filter(v => selectedVoucherIds.includes(v.acknowledgement_id)),
         [readyVouchers, selectedVoucherIds]
     );
+
+    const allVisibleSelected = filteredReadyVouchers.length > 0
+        && filteredReadyVouchers.every(v => selectedVoucherIds.includes(v.acknowledgement_id));
 
     const sumIfas = useMemo(
         () => selectedVouchers.reduce((sum, row) => sum + (Number(row.sum_ifas) || 0), 0),
@@ -179,6 +184,15 @@ const DedicatedMarketSettlement = () => {
         );
     };
 
+    const toggleAllVisibleVouchers = () => {
+        setCommissionTouched(false);
+        const visibleIds = filteredReadyVouchers.map(v => v.acknowledgement_id);
+        setSelectedVoucherIds(prev => allVisibleSelected
+            ? prev.filter(id => !visibleIds.includes(id))
+            : [...new Set([...prev, ...visibleIds])]
+        );
+    };
+
     const validate = () => {
         if (!form.owner_id) return 'Owner Name is required';
         if (!form.cash_bank) return 'Cash / Bank is required';
@@ -215,6 +229,7 @@ const DedicatedMarketSettlement = () => {
 
             const res = await dedicatedMarketSettlementAPI.create(payload);
             if (res.success) {
+                setConfirmationOpen(false);
                 setSuccessMsg('Dedicated/Market settlement saved successfully');
                 await loadReadyVouchers(form.owner_id, form.vehicle_number || null);
                 await loadSettlements();
@@ -224,6 +239,16 @@ const DedicatedMarketSettlement = () => {
         } finally {
             setSubmitting(false);
         }
+    };
+
+    const openConfirmation = () => {
+        setError('');
+        const validationMessage = validate();
+        if (validationMessage) {
+            setError(validationMessage);
+            return;
+        }
+        setConfirmationOpen(true);
     };
 
     const filteredSettlements = useMemo(() => {
@@ -328,7 +353,18 @@ const DedicatedMarketSettlement = () => {
                             <Table>
                                 <TableHeader className="bg-slate-50/60">
                                     <TableRow>
-                                        <TableHead>Select</TableHead>
+                                        <TableHead>
+                                            <label className="flex items-center gap-2 whitespace-nowrap">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={allVisibleSelected}
+                                                    onChange={toggleAllVisibleVouchers}
+                                                    disabled={filteredReadyVouchers.length === 0}
+                                                    aria-label="Select all ready vouchers"
+                                                />
+                                                <span>Select all</span>
+                                            </label>
+                                        </TableHead>
                                         <TableHead>Vehicle Number</TableHead>
                                         <TableHead>Voucher Number</TableHead>
                                         <TableHead>Sum of IFAs</TableHead>
@@ -400,15 +436,34 @@ const DedicatedMarketSettlement = () => {
                         </div>
 
                         <div className="flex justify-end">
-                            <Button onClick={handleSettled} disabled={submitting || !form.owner_id}>
-                                {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                            <Button onClick={openConfirmation} disabled={submitting || !form.owner_id}>
                                 <CheckCircle2 className="w-4 h-4 mr-2" />
-                                Settled
+                                Ready for settlement
                             </Button>
                         </div>
                     </div>
                 </CardContent>
             </Card>
+
+            <SettlementConfirmationDialog
+                open={confirmationOpen}
+                onOpenChange={setConfirmationOpen}
+                partyLabel="Dedicated Owner"
+                partyName={selectedOwner?.owner_name}
+                cashBank={form.cash_bank}
+                onCashBankChange={onCashBankChange}
+                bankDetails={{
+                    bank_name: form.bank_name,
+                    branch: form.branch,
+                    account_number: form.account_no,
+                    ifsc_code: form.ifsc_code
+                }}
+                selectedVouchers={selectedVouchers}
+                amount={finalBalance}
+                amountLabel="Total Amount to be Settled"
+                submitting={submitting}
+                onConfirm={handleSettled}
+            />
 
             <Card className="border-none shadow-md">
                 <CardHeader className="border-b border-slate-100 pb-4">
