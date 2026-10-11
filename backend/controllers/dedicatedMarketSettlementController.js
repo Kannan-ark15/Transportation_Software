@@ -110,9 +110,6 @@ const createSettlement = async (req, res, next) => {
         if (!cash_bank || !['Cash', 'Bank'].includes(cash_bank)) {
             return res.status(400).json({ success: false, message: 'cash_bank must be Cash or Bank' });
         }
-        if (!vehicle_number || !String(vehicle_number).trim()) {
-            return res.status(400).json({ success: false, message: 'vehicle_number is required' });
-        }
         if (!Array.isArray(selected_vouchers) || selected_vouchers.length === 0) {
             return res.status(400).json({ success: false, message: 'At least one voucher must be selected' });
         }
@@ -130,6 +127,7 @@ const createSettlement = async (req, res, next) => {
         }
 
         const owner = ownerRes.rows[0];
+        const normalizedVehicleNumber = vehicle_number ? String(vehicle_number).trim() : null;
         const effectiveBankName = cash_bank === 'Bank' ? owner.bank_name || null : null;
         const effectiveBranch = cash_bank === 'Bank' ? owner.branch || null : null;
         const effectiveAccountNo = cash_bank === 'Bank' ? owner.account_no || null : null;
@@ -150,6 +148,7 @@ const createSettlement = async (req, res, next) => {
             `SELECT
                 a.id AS acknowledgement_id,
                 la.id AS loading_advance_id,
+                v.id AS vehicle_id,
                 a.voucher_number,
                 la.vehicle_registration_number AS vehicle_number,
                 COALESCE(
@@ -159,6 +158,7 @@ const createSettlement = async (req, res, next) => {
                 )::DECIMAL(12,2) AS sum_ifas
              FROM acknowledgements a
              JOIN loading_advances la ON la.id = a.loading_advance_id
+             LEFT JOIN vehicles v ON v.vehicle_no = la.vehicle_registration_number
              JOIN owners o ON (
                  o.id = la.owner_id
                  OR (
@@ -171,10 +171,10 @@ const createSettlement = async (req, res, next) => {
              WHERE a.id = ANY($1::INT[])
                AND a.voucher_status = $2
                AND o.id = $3
-               AND la.vehicle_registration_number = $4
+               AND ($4::TEXT IS NULL OR la.vehicle_registration_number = $4)
                AND dmsv.id IS NULL
              ORDER BY a.id`,
-            [ackIds, READY_STATUS, owner_id, String(vehicle_number).trim()]
+            [ackIds, READY_STATUS, owner_id, normalizedVehicleNumber]
         );
 
         if (voucherRes.rows.length !== ackIds.length) {
@@ -267,6 +267,34 @@ const createSettlement = async (req, res, next) => {
             );
             settlement.settlement_balance = roundedTotalFinalBalance;
         }
+
+        const primaryVehicle = voucherRes.rows[0];
+        await client.query(
+            `INSERT INTO cashbook_payments
+                (payment_date, vehicle_id, vehicle_number, payment_category, reference_category,
+                 reference_module, reference_record_type, reference_record_id,
+                 reference_amount_snapshot, amount_paid, remarks)
+             VALUES (CURRENT_DATE, $1, $2, 'Transactions', $3,
+                     'Dedicated Owner Payable', 'Settlement', $4, $5, $5,
+                     'Auto-created from Balance Settlement')`,
+            [
+                primaryVehicle.vehicle_id || null,
+                primaryVehicle.vehicle_number,
+                cash_bank,
+                settlement.id,
+                Number(toNumber(settlement.settlement_balance).toFixed(2))
+            ]
+        );
+
+        const settledRes = await client.query(
+            `UPDATE dedicated_market_settlements
+             SET settled = TRUE,
+                 settled_at = CURRENT_TIMESTAMP
+             WHERE id = $1
+             RETURNING *`,
+            [settlement.id]
+        );
+        if (settledRes.rows[0]) Object.assign(settlement, settledRes.rows[0]);
 
         await client.query('COMMIT');
         res.status(201).json({ success: true, data: settlement });

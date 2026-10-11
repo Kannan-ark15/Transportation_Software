@@ -12,6 +12,7 @@ import { Loader2, CircleDollarSign, SearchX, CheckCircle2 } from 'lucide-react';
 import SettlementConfirmationDialog from './SettlementConfirmationDialog';
 
 const DEFAULT_COMMISSION_PERCENT = 6;
+const ALL_VEHICLES = '__ALL_VEHICLES__';
 
 const DedicatedMarketSettlement = () => {
     const [owners, setOwners] = useState([]);
@@ -173,8 +174,9 @@ const DedicatedMarketSettlement = () => {
     };
 
     const onVehicleFilterChange = async (vehicleNumber) => {
-        setForm(prev => ({ ...prev, vehicle_number: vehicleNumber }));
-        if (form.owner_id) await loadReadyVouchers(form.owner_id, vehicleNumber || null);
+        const normalizedVehicleNumber = vehicleNumber === ALL_VEHICLES ? '' : vehicleNumber;
+        setForm(prev => ({ ...prev, vehicle_number: normalizedVehicleNumber }));
+        if (form.owner_id) await loadReadyVouchers(form.owner_id, normalizedVehicleNumber || null);
     };
 
     const toggleVoucherSelection = (ackId) => {
@@ -197,7 +199,6 @@ const DedicatedMarketSettlement = () => {
         if (!form.owner_id) return 'Owner Name is required';
         if (!form.cash_bank) return 'Cash / Bank is required';
         if (selectedVoucherIds.length === 0) return 'Select at least one settlement-ready voucher';
-        if (!form.vehicle_number) return 'Vehicle Number is required';
         if (form.cash_bank === 'Bank' && (!form.bank_name || !form.branch || !form.account_no || !form.ifsc_code)) {
             return 'Bank details are required when Cash / Bank is Bank';
         }
@@ -222,7 +223,7 @@ const DedicatedMarketSettlement = () => {
             const payload = {
                 owner_id: Number(form.owner_id),
                 cash_bank: form.cash_bank,
-                vehicle_number: form.vehicle_number,
+                vehicle_number: form.vehicle_number || null,
                 commission_amount: Number(commissionAmount),
                 selected_vouchers: selectedVouchers.map(v => ({ acknowledgement_id: v.acknowledgement_id }))
             };
@@ -340,9 +341,10 @@ const DedicatedMarketSettlement = () => {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="space-y-1">
                                 <Label>Vehicle Number</Label>
-                                <Select value={form.vehicle_number} onValueChange={onVehicleFilterChange} disabled={!form.owner_id}>
-                                    <SelectTrigger><SelectValue placeholder="Select vehicle" /></SelectTrigger>
+                                <Select value={form.vehicle_number || ALL_VEHICLES} onValueChange={onVehicleFilterChange} disabled={!form.owner_id}>
+                                    <SelectTrigger><SelectValue placeholder="All Vehicles" /></SelectTrigger>
                                     <SelectContent>
+                                        <SelectItem value={ALL_VEHICLES}>All Vehicles</SelectItem>
                                         {vehicleOptions.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
                                     </SelectContent>
                                 </Select>

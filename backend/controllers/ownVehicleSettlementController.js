@@ -267,6 +267,7 @@ const createSettlement = async (req, res, next) => {
             `SELECT
                 a.id AS acknowledgement_id,
                 la.id AS loading_advance_id,
+                v.id AS vehicle_id,
                 la.vehicle_registration_number AS vehicle_number,
                 a.voucher_number,
                 la.voucher_datetime AS voucher_date,
@@ -290,6 +291,7 @@ const createSettlement = async (req, res, next) => {
                 a.mileage::DECIMAL(12,3) AS mileage
              FROM acknowledgements a
              JOIN loading_advances la ON la.id = a.loading_advance_id
+             LEFT JOIN vehicles v ON v.vehicle_no = la.vehicle_registration_number
              LEFT JOIN own_vehicle_settlement_vouchers ovsv ON ovsv.loading_advance_id = la.id
              WHERE a.id = ANY($1::INT[])
                AND a.voucher_status = $2
@@ -445,6 +447,34 @@ const createSettlement = async (req, res, next) => {
             settlement.id,
             Math.max(roundedTotalDriverBalance, 0)
         );
+
+        const primaryVehicle = voucherRes.rows[0];
+        await client.query(
+            `INSERT INTO cashbook_payments
+                (payment_date, vehicle_id, vehicle_number, payment_category, reference_category,
+                 reference_module, reference_record_type, reference_record_id,
+                 reference_amount_snapshot, amount_paid, remarks)
+             VALUES (CURRENT_DATE, $1, $2, 'Transactions', $3,
+                     'Driver Salary Payable', 'Settlement', $4, $5, $5,
+                     'Auto-created from Balance Settlement')`,
+            [
+                primaryVehicle.vehicle_id || null,
+                primaryVehicle.vehicle_number,
+                cash_bank,
+                settlement.id,
+                driverSalaryPayable
+            ]
+        );
+
+        const settledRes = await client.query(
+            `UPDATE own_vehicle_settlements
+             SET settled = TRUE,
+                 settled_at = CURRENT_TIMESTAMP
+             WHERE id = $1
+             RETURNING *`,
+            [settlement.id]
+        );
+        if (settledRes.rows[0]) Object.assign(settlement, settledRes.rows[0]);
 
         await client.query('COMMIT');
         res.status(201).json({ success: true, data: settlement });
